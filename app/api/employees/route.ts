@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       motherName:body.motherName,
       profileFilename:body.profileFilename,
       profileUrl:body.profileUrl,
+      isUploadedtoR2:body.isUploadedtoR2||false,
       dateOfBirth: body.dateOfBirth,
       gender: body.gender,
       bloodGroup: body.bloodGroup || '',

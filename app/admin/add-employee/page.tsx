@@ -22,6 +22,7 @@ export default function AddEmployeePage() {
     bloodGroup: '',
     maritalStatus: '',
     profileUrl:'',
+    isUploadedtoR2:'',
     profileFilename:'',
 
     
@@ -223,7 +224,7 @@ export default function AddEmployeePage() {
         {/* Personal Information */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Personal Information</h2>
-           <ProfilePhotoUpload onUploadSuccess={(photoUrl ,filename)=>setFormData({ ...formData, profileUrl: photoUrl, profileFilename:filename })}/>
+           <ProfilePhotoUpload onUploadSuccess={(photoUrl:string ,filename:string ,isUploadedtoR2:string)=>setFormData({ ...formData, profileUrl: photoUrl, profileFilename:filename ,isUploadedtoR2 })}/>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

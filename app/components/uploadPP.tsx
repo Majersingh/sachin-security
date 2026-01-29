@@ -6,7 +6,7 @@ import { Upload, Camera, Loader2, X, Check } from 'lucide-react';
 import Image from 'next/image';
 
 interface ProfilePhotoUploadProps {
-  onUploadSuccess?: (photoUrl: string , filename:string) => void;
+  onUploadSuccess?: (photoUrl: string , filename:string ,isUploadedtoR2:string) => void;
   existingPhotoUrl?: string;
 }
 
@@ -76,13 +76,9 @@ export default function ProfilePhotoUpload({
         
         // Call parent callback if provided
         if (onUploadSuccess) {
-          onUploadSuccess(data.data.url , data.data.filename);
+          onUploadSuccess(data.data.url , data.data.filename ,data.data.isUploadedtoR2);
         }
 
-        // Reset success message after 3 seconds
-        setTimeout(() => {
-          setUploadSuccess(false);
-        }, 3000);
       } else {
         setError(data.error || 'Upload failed');
       }
