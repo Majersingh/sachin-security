@@ -23,6 +23,7 @@ export default function ITSection({
   });
 
   return (
+  <>
     <section id="it-security" className="py-4 bg-slate-900 overflow-hidden">
       {/* Background accent */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-amber-500/10 rounded-full blur-[120px]" />
@@ -153,5 +154,109 @@ export default function ITSection({
         </div>
       </div>
     </section>
+    <section className='bg-slate-900'>
+        {/* 🛡️ Side-by-Side Split: Details vs Live PDF Embed */}
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch">
+          
+          {/* LEFT COLUMN: Specifications & Action Details (5/12 width) */}
+          <div className="lg:col-span-5 flex flex-col justify-between space-y-6">
+            <div className="space-y-6">
+              <div>
+                <span className="bg-red-500/10 text-red-400 text-xs font-semibold px-3 py-1 rounded-full border border-red-500/20 uppercase tracking-wider">
+                  Our Flagship Platform
+                </span>
+                <h3 className="text-3xl sm:text-4xl font-extrabold mt-4 text-white tracking-tight leading-tight">
+                  AI-Powered Integrated <br />
+                  <span className="bg-linear-to-r from-red-500 to-amber-500 bg-clip-text text-transparent">
+                    Physical Security
+                  </span>
+                </h3>
+              </div>
+
+              <p className="text-slate-300 text-base leading-relaxed">
+                Transforming enterprise security from manpower-heavy reactivity to automated, proactive intelligence. Expand surveillance coverage by 300% while reducing physical guarding overhead costs by up to 50%.
+              </p>
+
+              {/* Core Ecosystem Modules */}
+              <div className="space-y-4 pt-2">
+                <div className="flex gap-3">
+                  <div className="shrink-0 w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 font-bold text-sm">01</div>
+                  <div>
+                    <h4 className="font-semibold text-slate-100 text-sm">Centralized Command Center</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">Every geographic facility and system mapped natively to a single screen interface.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="shrink-0 w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 font-bold text-sm">02</div>
+                  <div>
+                    <h4 className="font-semibold text-slate-100 text-sm">Computer Vision Suite</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">Automated detection rules targeting zone intrusions, safety gear compliance, and early fire.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="shrink-0 w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 font-bold text-sm">03</div>
+                  <div>
+                    <h4 className="font-semibold text-slate-100 text-sm">Intelligent Gateway Access</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">Contactless QR-based pre-registration completely bypassing physical security lobby delays.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Live Interactive Document Viewer Frame (7/12 width) */}
+          <div className="lg:col-span-7 flex flex-col">
+            <div className="relative bg-slate-950 border border-slate-800 rounded-xl shadow-2xl overflow-hidden flex-1 flex flex-col h-[550px] lg:h-full min-h-[500px]">
+              
+              {/* Browser Window Style Header UI */}
+              <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span className="text-slate-400 font-mono tracking-wide text-xs">PRODUCT_PROPOSAL.PDF</span>
+                </div>
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-slate-700" />
+                  <div className="w-2 h-2 rounded-full bg-slate-700" />
+                  <div className="w-2 h-2 rounded-full bg-slate-700" />
+                </div>
+              </div>
+
+              {/* Embedded Document Frame Component */}
+              <div className="relative w-full flex-1 bg-slate-900">
+                <iframe 
+                  src="/it-ai-product.pdf#toolbar=0&navpanes=0" 
+                  title="Sachin Security Solutions AI Platform Proposal"
+                  className="w-full h-full border-0 absolute inset-0"
+                  loading="lazy"
+                >
+                  <p className="text-sm text-slate-400 p-4 text-center">
+                    Your browser does not support inline document viewing. 
+                    <a href="/security-proposal.pdf" className="text-red-400 underline ml-1">Click here to access the file directly.</a>
+                  </p>
+                </iframe>
+              </div>
+
+              {/* Mobile Compatibility / Direct Access Download Bar */}
+              <div className="bg-slate-900/90 border-t border-slate-800 px-4 py-2.5 flex items-center justify-between text-xs text-slate-400 shrink-0">
+                <span>Interactive Viewer Mode</span>
+                <a 
+                  href="/it-ai-product.pdf" 
+                  download="Sachin-Security-AI-Platform-Proposal.pdf"
+                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded font-medium transition-all"
+                >
+                  <span>📥</span> Download Full Copy
+                </a>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </>
   );
 }

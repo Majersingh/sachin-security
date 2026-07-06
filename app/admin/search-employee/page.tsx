@@ -30,7 +30,7 @@ export default function SearchEmployeePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  
+  const [isIdModalOpen, setIsIdModalOpen] = useState(false);
   // Filter states
   const [filters, setFilters] = useState({
     workLocation: '',
@@ -150,6 +150,12 @@ export default function SearchEmployeePage() {
   const handleViewDetails = (employee: any) => {
     setSelectedEmployee(employee);
     setShowDetailsModal(true);
+  };
+
+  //view Id card
+   const openIdCard = (employee: any) => {
+    setSelectedEmployee(employee);
+    setIsIdModalOpen(true);
   };
 
   // Export to CSV
@@ -396,7 +402,7 @@ export default function SearchEmployeePage() {
         </div>
 
         {/* Employee Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto w-full">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -435,28 +441,17 @@ export default function SearchEmployeePage() {
                         {employee.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleViewDetails(employee)}
-                          className="p-2 hover:bg-gray-100 rounded-lg"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4 text-gray-600" />
-                        </button>
-                        {/* <button
-                          className="p-2 hover:bg-gray-100 rounded-lg"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4 text-gray-600" />
-                        </button> */}
-                        <button
-                          className="p-2 hover:bg-gray-100 rounded-lg"
-                          title="Delete"
-                        >
-                          {/* <Trash2 className="w-4 h-4 text-red-600" /> */}
-                        </button>
-                      </div>
+                   <td colSpan={2} className="px-4 py-3 whitespace-nowrap w-full"> 
+                      <div className="flex w-full items-center justify-center gap-2"> 
+                        <button onClick={() => handleViewDetails(employee)} className="p-2 hover:bg-gray-100 rounded-lg" title="View Details" > 
+                          <Eye className="w-4 h-4 text-gray-600" /> 
+                        </button> 
+                        <button onClick={() => openIdCard(employee)} className="bg-amber-600 text-slate-100 px-2 py-1 text-sm rounded-lg hover:bg-amber-700 whitespace-nowrap" > 
+                          View ID Card 
+                        </button> 
+                        {/* <button className="p-2 hover:bg-gray-100 rounded-lg" title="Edit" > <Edit className="w-4 h-4 text-gray-600" /> </button> */} 
+                        {/* <button className="p-2 hover:bg-gray-100 rounded-lg" title="Delete" > <Trash2 className="w-4 h-4 text-red-600" /> </button>  */}
+                      </div> 
                     </td>
                   </tr>
                 ))
@@ -473,6 +468,12 @@ export default function SearchEmployeePage() {
           onClose={() => setShowDetailsModal(false)}
         />
       )}
+      {/* Id card */}
+      <IDCardModal 
+        isOpen={isIdModalOpen} 
+        onClose={() => setIsIdModalOpen(false)} 
+        employee={selectedEmployee} 
+      />
     </div>
   );
 }
@@ -649,24 +650,36 @@ function DownloadEmppdf({
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = 210;
 
-      // Header
+      // 1. सबसे ऊपर Logo जोड़ें (public/logo.png से)
+      try {
+        // लोगो को बेस64 में बदल कर PDF में जोड़ रहे हैं
+        const logoData = await toBase64('/logo.png');
+        // x: 14, y: 10, width: 25, height: 25 (आप साइज बदल सकते हैं)
+        pdf.addImage(logoData, 'PNG', 14, 10, 25, 25); 
+      } catch (logoErr) {
+        console.error("Logo लोड करने में दिक्कत आई:", logoErr);
+      }
+
+      // 2. Header Text (लोगो के बगल में सेट किया गया)
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(16);
-      pdf.text('Sachin Security Services Pvt. Ltd.', pageWidth / 2, 20, { align: 'center' });
+      // नाम को बीच में रखने के बजाय थोड़ा दाईं तरफ खिसकाया है
+      pdf.text('Sachin Security Services', (pageWidth / 2) + 10, 20, { align: 'center' });
       pdf.setFontSize(11);
-      pdf.text('Employee Details Slip', pageWidth / 2, 28, { align: 'center' });
+      pdf.text('Employee Details Slip', (pageWidth / 2) + 10, 28, { align: 'center' });
 
-      // Photo
+      // Employee Photo (दाहिनी तरफ)
       if (employee.profileUrl) {
         try {
           const imgData = await toBase64(employee.profileUrl);
-          pdf.addImage(imgData, 'JPEG', 160, 35, 30, 30);
+          pdf.addImage(imgData, 'JPEG', 160, 42, 30, 30); // y को थोड़ा नीचे (42) किया है
         } catch {}
       }
 
-      // Basic Info
-      let y = 40;
+      // Basic Info (y की शुरुआत 40 के बजाय 45 से की है ताकि लोगो से न टकराए)
+      let y = 45;
       pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11); // फॉन्ट साइज रीसेट किया
       pdf.text('Personal Details', 14, y);
       pdf.setLineWidth(0.2);
       pdf.line(14, y + 1, 150, y + 1);
@@ -700,6 +713,11 @@ function DownloadEmppdf({
       addRow('Designation', employee.designation);
       addRow('Department', employee.department);
       addRow('Joining Date', employee.joiningDate);
+      addRow('Aadhar No.', employee.aadharNumber);
+      addRow('PAN', employee.panNumber);
+      addRow('PF Number', employee.pfNumber);
+      addRow('UAN', employee.uanNumber);
+      addRow('ESI No.', employee.esiNumber);
       addRow('Employment Type', employee.employmentType);
       addRow('Work Location', employee.workLocation);
 
@@ -710,12 +728,12 @@ function DownloadEmppdf({
       pdf.line(14, y + 1, 196, y + 1);
       y += 8;
       addRow('Basic Salary', employee.basicSalary);
-      addRow('HRA', employee.hra);
-      addRow('Other Allowances', employee.otherAllowances);
-      addRow('Bank Name', employee.bankName);
-      addRow('A/C Number', employee.accountNumber);
-      addRow('IFSC Code', employee.ifscCode);
-      addRow('Branch', employee.branchName);
+      // addRow('HRA', employee.hra);
+      // addRow('Other Allowances', employee.otherAllowances);
+      // addRow('Bank Name', employee.bankName);
+      // addRow('A/C Number', employee.accountNumber);
+      // addRow('IFSC Code', employee.ifscCode);
+      // addRow('Branch', employee.branchName);
 
       // Emergency Contact
       y += 5;
@@ -766,6 +784,188 @@ function DownloadEmppdf({
         {isGeneratingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
         PDF
     </button>
-)
-       
+  );
+}
+
+import QRCode from "qrcode";
+import { Printer } from "lucide-react";
+
+
+interface IDCardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  employee: any;
+}
+
+function IDCardModal({ isOpen, onClose, employee }: IDCardModalProps) {
+  const [qrSrc, setQrSrc] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!isOpen || !employee) return;
+
+    setLoading(true);
+    // लाइव वेरिफिकेशन के लिए QR कोड का लिंक तैयार करें
+    const profileLink = `${window.location.origin}/employees/${employee.employeeId}`;
+    console.log(profileLink)
+
+    // QR कोड इमेज (Base64) जेनरेट करें
+    QRCode.toDataURL(profileLink, { width: 200, margin: 1 })
+      .then((url) => {
+        setQrSrc(url);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("QR Code Error:", err);
+        setLoading(false);
+      });
+  }, [isOpen, employee]);
+
+  // अगर मॉडल ओपन नहीं है या कर्मचारी का डेटा नहीं है तो कुछ न दिखाएं
+  if (!isOpen || !employee) return null;
+
+  const handlePrint = () => {
+    window.print(); // सिर्फ ID कार्ड प्रिंट करने के लिए ब्राउज़र का प्रिंटर खोलें
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print-backdrop text-black">
+      {/* मॉडल का मुख्य बॉक्स */}
+      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl relative border border-gray-200 modal-container animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* मॉडल का हेडर (प्रिंट करने पर छुप जाएगा) */}
+        <div className="flex justify-between items-center border-b pb-3 mb-6 no-print">
+          <h3 className="text-lg font-bold text-gray-900">Employee ID Card</h3>
+          <div className="flex items-center gap-3">
+            {/* प्रिंट बटन */}
+            <button
+              onClick={handlePrint}
+              disabled={loading}
+              className="bg-amber-600 text-white px-4 py-1.5 rounded-lg flex items-center gap-2 hover:bg-amber-700 transition text-sm font-medium disabled:bg-gray-400"
+            >
+              <Printer className="w-4 h-4" /> Print ID Card
+            </button>
+            {/* क्लोज बटन */}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition p-1">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* लोडिंग स्टेट */}
+        {loading ? (
+          <div className="flex justify-center items-center h-48">
+            <Loader2 className="animate-spin text-amber-600 w-8 h-8" />
+          </div>
+        ) : (
+          /* ID कार्ड्स का डिस्प्ले सेक्शन */
+          <div className="flex flex-wrap justify-center gap-6 print-section">
+            
+            {/* 1. FRONT SIDE (सामने का भाग) */}
+            <div className="w-[3.375in] h-[2.125in] bg-white border border-gray-300 rounded-xl shadow-md relative flex flex-col justify-between overflow-hidden text-black font-sans select-none shrink-0" style={{ contentVisibility: 'auto' }}>
+              {/* टॉप बार */}
+              <div className="bg-zinc-900 text-white p-2 text-center">
+                <h1 className="text-[11px] font-bold uppercase tracking-wider leading-tight">Sachin Security Services</h1>
+                <p className="text-[7px] text-gray-300 tracking-wide uppercase mt-0.5">Identity Card</p>
+              </div>
+
+              {/* फोटो और मुख्य जानकारी */}
+              <div className="flex p-3 gap-3 items-center flex-1">
+                {/* प्रोफाइल फोटो */}
+                <div className="w-16 h-20 bg-gray-100 border border-zinc-400 rounded overflow-hidden shrink-0 shadow-sm">
+                  {employee.profileUrl ? (
+                    <img src={employee.profileUrl} alt="Emp Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[9px] text-gray-400 bg-gray-50">No Image</div>
+                  )}
+                </div>
+
+                {/* डिटेल्स */}
+                <div className="text-left leading-tight overflow-hidden">
+                  <h2 className="text-[12px] font-bold text-zinc-900 uppercase truncate">{employee.fullName}</h2>
+                  <p className="text-[9px] font-semibold text-amber-600 mb-2 truncate">{employee.designation}</p>
+                  
+                  <p className="text-[8px] text-gray-600"><span className="font-bold text-gray-700">ID NO:</span> {employee.employeeId}</p>
+                  <p className="text-[8px] text-gray-600"><span className="font-bold text-gray-700">Blood Gp:</span> {employee.bloodGroup || 'N/A'}</p>
+                  <p className="text-[8px] text-gray-600"><span className="font-bold text-gray-700">Mobile:</span> {employee.mobileNumber}</p>
+                </div>
+              </div>
+
+              {/* बॉटम डिजाइन लाइन */}
+              <div className="bg-amber-600 h-1.5 w-full"></div>
+            </div>
+
+            {/* 2. BACK SIDE (पीछे का भाग - QR कोड के साथ) */}
+            <div className="w-[3.375in] h-[2.125in] bg-zinc-900 border border-zinc-800 rounded-xl shadow-md relative flex flex-col justify-between p-3 text-white font-sans select-none shrink-0" style={{ contentVisibility: 'auto' }}>
+              
+              <div className="text-center">
+                <h3 className="text-[9px] font-bold text-amber-500 uppercase tracking-wide">Instructions</h3>
+                <p className="text-[6.5px] text-gray-400 mt-0.5 px-1 leading-normal">
+                  This card is non-transferable and remains the property of Sachin Security Services. If found, please return to the company office.
+                </p>
+              </div>
+
+              {/* QR कोड बॉक्स */}
+              <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg mx-1">
+                <div className="text-left max-w-[130px]">
+                  <p className="text-[8px] font-bold text-white uppercase tracking-wider">Scan for Verification</p>
+                  <p className="text-[6.5px] text-gray-400 mt-0.5 leading-tight">Scan this QR code using a smartphone camera to instantly verify live staff credentials.</p>
+                </div>
+                {/* लाइव जेनरेट हुआ QR कोड */}
+                {qrSrc && (
+                  <img src={qrSrc} alt="Verification QR" className="w-[52px] h-[52px] bg-white p-0.5 rounded shadow-sm" />
+                )}
+              </div>
+
+              {/* सिग्नेचर एरिया */}
+              <div className="flex justify-between items-end text-[7.5px] px-1 text-gray-400">
+                <p className="border-t border-gray-600 pt-1 px-1">Authorized Signatory</p>
+                <p className="font-mono text-[7px] text-amber-500">{employee.employeeId}</p>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </div>
+
+      {/* प्रिंट के लिए विशेष CSS नियम जो पेज के बाकी हिस्सों को छुपा देते हैं */}
+      <style jsx global>{`
+        @media print {
+          /* पूरे पेज की बाकी चीजों को छुपाएं */
+          body * {
+            visibility: hidden;
+          }
+          /* केवल प्रिंट सेक्शन और उसके अंदर की चीजों को दिखाएं */
+          .print-section, .print-section * {
+            visibility: visible;
+          }
+          /* कार्ड्स को प्रिंट पेज के सबसे ऊपरी बाएं कोने पर सही ढंग से सेट करें */
+          .print-section {
+            position: fixed;
+            left: 0;
+            top: 0;
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 24px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+          }
+          /* मॉडल के बैकड्रॉप और हेडर्स को प्रिंट से हटाएं */
+          .no-print {
+            display: none !important;
+          }
+          .no-print-backdrop {
+            background: none !important;
+            position: absolute !important;
+          }
+          .modal-container {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
 }

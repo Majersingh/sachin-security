@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+    const totalEmployees = await collection.countDocuments({});
     const employeeData = {
       // Personal Information
       fullName: body.fullName,
@@ -111,7 +111,8 @@ export async function POST(request: NextRequest) {
       panNumber: body.panNumber,
       
       // Employment Details
-      employeeId: body.employeeId,
+      // employeeId: body.employeeId,
+      employeeId: `ss-${totalEmployees+1}`,
       designation: body.designation,
       department: body.department,
       joiningDate: body.joiningDate,

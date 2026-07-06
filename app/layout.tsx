@@ -1,11 +1,8 @@
 // app/layout.tsx
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import Nav from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://sachinsecurity.co.in"),
@@ -105,7 +102,7 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/logo.png" type="image/png" sizes="32x32" />
       </head>
-      <body className={inter.className}>
+      <body>
         <Nav />
         {children}
         <Footer />
