@@ -62,6 +62,7 @@ export const ORG_CONFIGS: Record<OrgEntity, OrgEntityConfig> = {
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
       { key: "branch", label: "Branch", type: "ref", refEntity: "branches" },
+      { key: "location", label: "Deployment Location", type: "ref", refEntity: "locations" },
       { key: "description", label: "Description", type: "textarea" },
     ],
   },

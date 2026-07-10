@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Plus, Pencil, X } from "lucide-react";
+import { Loader2, Plus, Pencil, X, Users, Trash2 } from "lucide-react";
 import { ORG_CONFIGS, type OrgEntity } from "@/app/lib/org";
+import EmployeeCombobox from "@/app/components/EmployeeCombobox";
 
 // Generic list + create/edit/deactivate UI for any org entity, driven by ORG_CONFIGS.
 // Reference fields store the referenced record's display name (e.g. department name).
@@ -17,6 +18,12 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
   const [form, setForm] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Team membership (only used when entity === "teams").
+  const [membersTeam, setMembersTeam] = useState<any | null>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [memberBusy, setMemberBusy] = useState(false);
 
   const columns = config.fields.filter((f) => f.type !== "textarea");
 
@@ -104,6 +111,49 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
     await load();
   };
 
+  const loadMembers = useCallback(async (teamId: string) => {
+    setMembersLoading(true);
+    try {
+      const res = await fetch(`/api/teams/${teamId}/members`);
+      const data = await res.json();
+      if (data.success) setMembers(data.members);
+    } finally {
+      setMembersLoading(false);
+    }
+  }, []);
+
+  const openMembers = (team: any) => {
+    setMembersTeam(team);
+    setMembers([]);
+    loadMembers(team._id);
+  };
+
+  const addMember = async (employeeId: string) => {
+    if (!membersTeam || !employeeId) return;
+    setMemberBusy(true);
+    try {
+      await fetch(`/api/teams/${membersTeam._id}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId }),
+      });
+      await loadMembers(membersTeam._id);
+    } finally {
+      setMemberBusy(false);
+    }
+  };
+
+  const removeMember = async (employeeId: string) => {
+    if (!membersTeam) return;
+    setMemberBusy(true);
+    try {
+      await fetch(`/api/teams/${membersTeam._id}/members?employeeId=${encodeURIComponent(employeeId)}`, { method: "DELETE" });
+      await loadMembers(membersTeam._id);
+    } finally {
+      setMemberBusy(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -152,6 +202,11 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
+                        {entity === "teams" && (
+                          <button onClick={() => openMembers(item)} className="px-3 py-1 text-sm rounded-lg font-medium text-amber-700 hover:bg-amber-50 flex items-center gap-1" title="Manage members">
+                            <Users className="w-4 h-4" /> Members
+                          </button>
+                        )}
                         <button onClick={() => openEdit(item)} className="p-2 hover:bg-gray-100 rounded-lg" title="Edit">
                           <Pencil className="w-4 h-4 text-gray-600" />
                         </button>
@@ -232,6 +287,59 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Team members modal */}
+      {membersTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b p-5">
+              <h3 className="text-lg font-bold text-gray-900">Members — {membersTeam.name}</h3>
+              <button onClick={() => setMembersTeam(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Add member</label>
+                <EmployeeCombobox value="" onChange={(id) => id && addMember(id)} placeholder="Search employee to add…" />
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500 mb-2">
+                  {members.length} member{members.length === 1 ? "" : "s"}
+                </p>
+                {membersLoading ? (
+                  <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 text-amber-600 animate-spin" /></div>
+                ) : members.length === 0 ? (
+                  <p className="text-gray-500 text-sm py-4">No members yet. Use the search above to add.</p>
+                ) : (
+                  <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+                    {members.map((m) => (
+                      <li key={m.employeeId} className="flex items-center justify-between px-3 py-2">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{m.fullName}</div>
+                          <div className="text-xs text-gray-500">
+                            {m.employeeId}
+                            {m.designation ? ` · ${m.designation}` : ""}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeMember(m.employeeId)}
+                          disabled={memberBusy}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40"
+                          title="Remove from team"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
