@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import Image from "next/image";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
@@ -35,68 +37,54 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ maxWidth: 320, margin: "50px auto", textAlign: "center", backgroundColor: 'white', padding: 20, borderRadius: 8 }}>
-      <h2 className="text-black" style={{ color: 'black', marginBottom: 20 }}>Login</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Email or Employee ID"
-          value={identifier}
-          onChange={(e) => setIdentifier(e.target.value)}
-          required
-          disabled={isLoading}
-          style={{ width: "100%", padding: 8, marginBottom: 10, border: '1px solid gray', color: 'black' }}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          disabled={isLoading}
-          style={{ width: "100%", padding: 8, marginBottom: 10, border: '1px solid gray', color: 'black' }}
-        />
-        <button
-          type="submit"
-          disabled={isLoading}
-          style={{
-            width: "100%",
-            padding: 8,
-            background: isLoading ? "#555" : "black",
-            color: "white",
-            border: "none",
-            cursor: isLoading ? "not-allowed" : "pointer",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: "10px"
-          }}
-        >
-          {isLoading ? (
-            <>
-              <span style={{
-                width: "16px",
-                height: "16px",
-                border: "2px solid white",
-                borderTop: "2px solid transparent",
-                borderRadius: "50%",
-                animation: "spin 1s linear infinite"
-              }}></span>
-              <span>Loading...</span>
-            </>
-          ) : (
-            "Login"
-          )}
-        </button>
-      </form>
-      {error && <p style={{ color: "red", marginTop: 10 }}>{error}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
+        <div className="flex flex-col items-center text-center mb-6">
+          <div className="relative w-16 h-16 mb-3">
+            <Image src="/logo.png" alt="Sachin Security Services" fill className="object-contain" priority />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">Welcome to Sachin Security</h1>
+          <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
+        </div>
 
-      <style jsx global>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="text"
+            placeholder="Email or Employee ID"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            required
+            disabled={isLoading}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:bg-gray-100"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={isLoading}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:bg-gray-100"
+          />
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Signing in…
+              </>
+            ) : (
+              "Login"
+            )}
+          </button>
+        </form>
+
+        {error && <p className="text-red-600 text-sm mt-3 text-center">{error}</p>}
+
+        <p className="text-xs text-gray-400 text-center mt-6">Sachin Security Services Pvt. Ltd.</p>
+      </div>
     </div>
   );
 }

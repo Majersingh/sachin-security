@@ -66,6 +66,11 @@ const navItems = [
 
 ].filter((item) => !item.adminOnly || role === 'admin');
 
+  // The login page is standalone — it must not render the admin sidebar/nav chrome.
+  if (pathname === '/admin/login') {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Top Navigation */}
