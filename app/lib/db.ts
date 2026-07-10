@@ -1,7 +1,9 @@
 // lib/db.ts
 import clientPromise from './mongodb';
 
-const DB_NAME = 'sachin-security-01';
+// Set DB_NAME in .env.local (e.g. sachin-security-staging-01) while building.
+// Defaults to the production DB so a deploy without DB_NAME is safe.
+const DB_NAME = process.env.DB_NAME || "sachin-security-staging-01";
 
 export async function getDatabase() {
   const client = await clientPromise;

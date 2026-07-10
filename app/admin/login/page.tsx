@@ -1,50 +1,51 @@
 "use client";
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
-  const [userID, setUserId] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false); // लोड होने की स्थिति के लिए
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setIsLoading(true); // सबमिट होते ही लोडिंग शुरू करें
+    setIsLoading(true);
 
     try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userID, password }),
+      const res = await signIn("credentials", {
+        identifier,
+        password,
+        redirect: false,
       });
 
-      if (res.ok) {
-        console.log("Logged in");
-        location.reload();
+      if (res?.error) {
+        setError("Invalid email/employee ID or password");
+        setIsLoading(false);
       } else {
-        const data = await res.json();
-        setError(data.message || "Login failed");
-        setIsLoading(false); // गड़बड़ होने पर बटन को वापस ठीक करें
+        // Middleware routes staff to /admin and employees to /portal (and forces
+        // a password reset when required).
+        window.location.href = "/admin";
       }
     } catch (err) {
       setError("Something went wrong. Please try again.");
-      setIsLoading(false); // एरर आने पर बटन को वापस ठीक करें
+      setIsLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 320, margin: "50px auto", textAlign: "center" , backgroundColor:'white', padding: 20, borderRadius: 8}}>
+    <div style={{ maxWidth: 320, margin: "50px auto", textAlign: "center", backgroundColor: 'white', padding: 20, borderRadius: 8 }}>
       <h2 className="text-black" style={{ color: 'black', marginBottom: 20 }}>Login</h2>
       <form onSubmit={handleSubmit}>
         <input
           type="text"
-          placeholder="User ID"
-          value={userID}
-          onChange={(e) => setUserId(e.target.value)}
+          placeholder="Email or Employee ID"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
           required
-          disabled={isLoading} // लोड होते समय इनपुट को बंद करें
-          style={{ width: "100%", padding: 8, marginBottom: 10 , border:'1px solid gray', color:'black' }}
+          disabled={isLoading}
+          style={{ width: "100%", padding: 8, marginBottom: 10, border: '1px solid gray', color: 'black' }}
         />
         <input
           type="password"
@@ -52,16 +53,16 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          disabled={isLoading} // लोड होते समय इनपुट को बंद करें
-          style={{ width: "100%", padding: 8, marginBottom: 10 ,border:'1px solid gray', color:'black'}}
+          disabled={isLoading}
+          style={{ width: "100%", padding: 8, marginBottom: 10, border: '1px solid gray', color: 'black' }}
         />
         <button
           type="submit"
-          disabled={isLoading} // लोड होते समय बटन को डिसेबल करें
+          disabled={isLoading}
           style={{
             width: "100%",
             padding: 8,
-            background: isLoading ? "#555" : "black", // डिसेबल होने पर रंग बदलें
+            background: isLoading ? "#555" : "black",
             color: "white",
             border: "none",
             cursor: isLoading ? "not-allowed" : "pointer",
@@ -73,7 +74,6 @@ export default function LoginPage() {
         >
           {isLoading ? (
             <>
-              {/* CSS से बना हुआ साधारण स्पिनर */}
               <span style={{
                 width: "16px",
                 height: "16px",
@@ -91,7 +91,6 @@ export default function LoginPage() {
       </form>
       {error && <p style={{ color: "red", marginTop: 10 }}>{error}</p>}
 
-      {/* स्पिनर को घुमाने के लिए CSS स्टाइल */}
       <style jsx global>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }

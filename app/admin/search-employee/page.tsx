@@ -461,10 +461,12 @@ export default function SearchEmployeePage() {
                         <button onClick={() => handleViewDetails(employee)} className="p-2 hover:bg-gray-100 rounded-lg" title="View Details" > 
                           <Eye className="w-4 h-4 text-gray-600" /> 
                         </button> 
-                        <button onClick={() => openIdCard(employee)} className="bg-amber-600 text-slate-100 px-2 py-1 text-sm rounded-lg hover:bg-amber-700 whitespace-nowrap" > 
-                          View ID Card 
-                        </button> 
-                        {/* <button className="p-2 hover:bg-gray-100 rounded-lg" title="Edit" > <Edit className="w-4 h-4 text-gray-600" /> </button> */} 
+                        <button onClick={() => openIdCard(employee)} className="bg-amber-600 text-slate-100 px-2 py-1 text-sm rounded-lg hover:bg-amber-700 whitespace-nowrap" >
+                          View ID Card
+                        </button>
+                        <a href={`/admin/edit-employee/${employee.employeeId}`} className="p-2 hover:bg-gray-100 rounded-lg" title="Edit">
+                          <Edit className="w-4 h-4 text-gray-600" />
+                        </a>
                         {/* <button className="p-2 hover:bg-gray-100 rounded-lg" title="Delete" > <Trash2 className="w-4 h-4 text-red-600" /> </button>  */}
                       </div> 
                     </td>

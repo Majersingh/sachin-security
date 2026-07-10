@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/app/lib/db';
 import { encryptId } from '@/app/lib/idcrypto';
+import { createEmployeeUser } from '@/app/lib/users';
+import { getMissingRequired, buildEmployeeFieldValues } from '@/app/lib/employeeFields';
 
 // GET - Fetch all employees
 export async function GET(request: NextRequest) {
@@ -37,6 +39,35 @@ export async function GET(request: NextRequest) {
           designations: clean(designations),
         },
       });
+    }
+
+    // Meta mode: return direct-report counts per manager as a single aggregation
+    // so the reporting page can show accurate counts without loading every row.
+    if (meta === 'reportCounts') {
+      const agg = await collection
+        .aggregate([
+          { $match: { reportingManagerId: { $nin: [null, ''] } } },
+          { $group: { _id: '$reportingManagerId', count: { $sum: 1 } } },
+        ])
+        .toArray();
+      const counts: Record<string, number> = {};
+      agg.forEach((r: any) => {
+        counts[r._id] = r.count;
+      });
+      return NextResponse.json({ success: true, counts });
+    }
+
+    // Meta mode: return just the hierarchy fields for every employee so the
+    // reporting page can build the full org tree in one lightweight request
+    // (this is intentionally not paginated — a tree needs all nodes at once).
+    if (meta === 'hierarchy') {
+      const rows = await collection
+        .find(
+          {},
+          { projection: { _id: 0, employeeId: 1, fullName: 1, designation: 1, department: 1, reportingManagerId: 1, profileUrl: 1 } }
+        )
+        .toArray();
+      return NextResponse.json({ success: true, data: rows });
     }
 
     // Pagination params
@@ -100,23 +131,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    // Validate required fields
-    const requiredFields = [
-      'fullName', 'fatherName', 'motherName', 'profileFilename', 'profileUrl','dateOfBirth', 'gender',
-      'mobileNumber', 'permanentAddress', 'city', 'state', 'pincode',
-      'aadharNumber', 'joiningDate', 'uanNumber', 'ifscCode' , 'accountNumber' , 'bankName' ,'workLocation'
-    ];
-    
-    for (const field of requiredFields) {
-      if (!body[field]) {
-        return NextResponse.json(
-          { success: false, error: `${field} is required` },
-          { status: 400 }
-        );
-      }
+
+    // Validate required fields against the central field registry.
+    const missing = getMissingRequired(body);
+    if (missing.length > 0) {
+      return NextResponse.json(
+        { success: false, error: `${missing[0].label} is required` },
+        { status: 400 }
+      );
     }
-    
+
     const collection = await getCollection('employees');
     
     // Check if employee ID already exists
@@ -131,73 +155,42 @@ export async function POST(request: NextRequest) {
       );
     }
     const totalEmployees = await collection.countDocuments({});
-    const employeeData = {
-      // Personal Information
-      fullName: body.fullName,
-      fatherName: body.fatherName,
-      motherName:body.motherName,
-      profileFilename:body.profileFilename,
-      profileUrl:body.profileUrl,
-      isUploadedtoR2:body.isUploadedtoR2||false,
-      dateOfBirth: body.dateOfBirth,
-      gender: body.gender,
-      bloodGroup: body.bloodGroup || '',
-      maritalStatus: body.maritalStatus || '',
-      
-      // Contact Information
-      mobileNumber: body.mobileNumber,
-      alternateNumber: body.alternateNumber || '',
-      email: body.email || '',
-      currentAddress: body.currentAddress,
-      permanentAddress: body.permanentAddress || '',
-      city: body.city,
-      state: body.state,
-      pincode: body.pincode,
-      
-      // Government IDs
-      aadharNumber: body.aadharNumber,
-      panNumber: body.panNumber,
-      
-      // Employment Details
-      // employeeId: body.employeeId,
-      employeeId: `ss-${totalEmployees+1}`,
-      designation: body.designation,
-      department: body.department,
-      joiningDate: body.joiningDate,
-      employmentType: body.employmentType || 'Full-time',
-      reportingManager: body.reportingManager || '',
-      workLocation: body.workLocation || '',
-      
-      // Salary & Benefits
-      basicSalary: body.basicSalary || '',
-      hra: body.hra || '',
-      otherAllowances: body.otherAllowances || '',
-      pfNumber: body.pfNumber || '',
-      esiNumber: body.esiNumber || '',
-      uanNumber: body.uanNumber || '',
-      
-      // Bank Details
-      bankName: body.bankName || '',
-      accountNumber: body.accountNumber || '',
-      ifscCode: body.ifscCode || '',
-      branchName: body.branchName || '',
-      
-      // Emergency Contact
-      emergencyContactName: body.emergencyContactName || '',
-      emergencyContactNumber: body.emergencyContactNumber || '',
-      emergencyContactRelation: body.emergencyContactRelation || '',
-      
+    const employeeData: Record<string, any> = {
+      // All form fields (values + per-field defaults) from the central registry.
+      ...buildEmployeeFieldValues(body),
+
+      // Server-managed fields (not collected from the form body):
+      isUploadedtoR2: body.isUploadedtoR2 || false,
+      employeeId: `ss-${totalEmployees + 1}`,
       status: 'Active',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
     
     const result = await collection.insertOne(employeeData);
-    
+
+    // Auto-create a login account for the new employee (role: employee) with a
+    // temporary password that must be reset on first login.
+    let tempPassword: string | null = null;
+    let loginId: string | null = null;
+    try {
+      const account = await createEmployeeUser({
+        employeeId: employeeData.employeeId,
+        email: employeeData.email,
+        name: employeeData.fullName,
+      });
+      tempPassword = account.tempPassword;
+      loginId = employeeData.email || employeeData.employeeId;
+    } catch (e) {
+      console.error('Failed to create employee login account:', e);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Employee added successfully',
-      data: { ...employeeData, _id: result.insertedId }
+      data: { ...employeeData, _id: result.insertedId },
+      // Shown once so HR can hand the credentials to the employee.
+      account: tempPassword ? { loginId, tempPassword } : null,
     }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json(
