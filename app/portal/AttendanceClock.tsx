@@ -3,12 +3,19 @@ import { useState, useEffect } from "react";
 import { Loader2, MapPin, LogIn, LogOut, CheckCircle2 } from "lucide-react";
 import { formatWorked } from "@/app/lib/attendance";
 
+interface Punch {
+  at: string;
+  distanceM?: number | null;
+}
 interface TodayRecord {
-  clockIn?: { at: string };
-  clockOut?: { at: string };
+  clockIn?: Punch;
+  clockOut?: Punch;
   status?: string;
   workedMinutes?: number;
 }
+
+const fmtDistance = (p?: Punch) =>
+  typeof p?.distanceM === "number" ? `${p.distanceM} m from site` : null;
 
 // Captures GPS via the browser. Rejects (and surfaces a clear error) if the user
 // denies location — clocking in/out is impossible without it, matching the API rule.
@@ -129,10 +136,16 @@ export default function AttendanceClock() {
         <div className="bg-gray-50 rounded-lg p-3">
           <p className="text-gray-500 text-xs">Clock In</p>
           <p className="font-semibold text-gray-900">{fmtTime(record?.clockIn?.at)}</p>
+          {fmtDistance(record?.clockIn) && (
+            <p className="text-[11px] text-gray-400 mt-0.5">{fmtDistance(record?.clockIn)}</p>
+          )}
         </div>
         <div className="bg-gray-50 rounded-lg p-3">
           <p className="text-gray-500 text-xs">Clock Out</p>
           <p className="font-semibold text-gray-900">{fmtTime(record?.clockOut?.at)}</p>
+          {fmtDistance(record?.clockOut) && (
+            <p className="text-[11px] text-gray-400 mt-0.5">{fmtDistance(record?.clockOut)}</p>
+          )}
         </div>
       </div>
 

@@ -421,7 +421,7 @@ export default function SearchEmployeePage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Aadhar No.</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Emp. ID</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Designation</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Department</th>
@@ -441,9 +441,9 @@ export default function SearchEmployeePage() {
                 </tr>
               ) : (
                 filteredEmployees.map((employee) => (
-                  <tr key={employee.aadharNumber} className="hover:bg-gray-50">
+                  <tr key={employee.employeeId} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                      {employee.aadharNumber}
+                      {employee.employeeId}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">{employee.fullName}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{employee.designation}</td>

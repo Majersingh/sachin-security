@@ -2,8 +2,9 @@
 // List + create for any Organization Structure entity, driven by ORG_CONFIGS.
 import { NextRequest, NextResponse } from "next/server";
 import { getCollection } from "@/app/lib/db";
-import { getOrgConfig } from "@/app/lib/org";
+import { getOrgConfig, readGeo, readNumber, readBoolean, codePrefix } from "@/app/lib/org";
 import { requirePermission } from "@/app/lib/apiAuth";
+import type { Collection } from "mongodb";
 
 // GET /api/org/:entity[?activeOnly=1]
 export async function GET(
@@ -44,6 +45,31 @@ export async function POST(
   // Build the document from configured fields only; validate required ones.
   const doc: Record<string, any> = {};
   for (const field of config.fields) {
+    if (field.generated) continue; // filled in server-side below
+    if (field.type === "geo") {
+      // A geo field stores `lat`/`lng` numbers on the doc (not the field key).
+      const g = readGeo(body);
+      if (field.required && !g) {
+        return NextResponse.json({ success: false, error: `${field.label} is required` }, { status: 400 });
+      }
+      if (g) {
+        doc.lat = g.lat;
+        doc.lng = g.lng;
+      }
+      continue;
+    }
+    if (field.type === "number") {
+      const n = readNumber(body[field.key]);
+      if (field.required && n === null) {
+        return NextResponse.json({ success: false, error: `${field.label} is required` }, { status: 400 });
+      }
+      if (n !== null) doc[field.key] = n;
+      continue;
+    }
+    if (field.type === "boolean") {
+      doc[field.key] = readBoolean(body[field.key], field.default ?? false);
+      continue;
+    }
     const value = typeof body[field.key] === "string" ? body[field.key].trim() : body[field.key];
     if (field.required && !value) {
       return NextResponse.json({ success: false, error: `${field.label} is required` }, { status: 400 });
@@ -64,6 +90,13 @@ export async function POST(
     );
   }
 
+  // Auto-generate values for generated fields (e.g. a location's `code`).
+  for (const field of config.fields) {
+    if (field.generated && field.key === "code") {
+      doc.code = await generateUniqueCode(collection, codePrefix(String(doc[config.displayField] || "")));
+    }
+  }
+
   doc.active = true;
   doc.createdAt = new Date();
   doc.updatedAt = new Date();
@@ -77,4 +110,14 @@ export async function POST(
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Find the first free `${prefix}NNN` code not already used in the collection.
+async function generateUniqueCode(collection: Collection, prefix: string): Promise<string> {
+  for (let i = 1; i < 10000; i++) {
+    const code = `${prefix}${String(i).padStart(3, "0")}`;
+    const exists = await collection.findOne({ code });
+    if (!exists) return code;
+  }
+  return `${prefix}${Date.now()}`;
 }

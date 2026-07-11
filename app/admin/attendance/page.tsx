@@ -7,15 +7,18 @@ import EmployeeCombobox from "@/app/components/EmployeeCombobox";
 const fmtTime = (iso?: string) =>
   iso ? new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—";
 
-// A clock punch stores { at, lat, lng, accuracy }; link to Google Maps if present.
+// A clock punch stores { at, lat, lng, accuracy }; link to Google Maps directions
+// to where it was punched, if present.
 const mapHref = (p?: { lat?: number; lng?: number } | null) =>
   p && typeof p.lat === "number" && typeof p.lng === "number"
-    ? `https://www.google.com/maps?q=${p.lat},${p.lng}`
+    ? `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`
     : null;
 
-// Renders a clock time plus a location pin linking to where it was punched.
-function TimeCell({ punch }: { punch?: { at?: string; lat?: number; lng?: number } | null }) {
+// Renders a clock time plus a location pin linking to where it was punched, and
+// the distance from the assigned site at punch time (when recorded).
+function TimeCell({ punch }: { punch?: { at?: string; lat?: number; lng?: number; distanceM?: number | null } | null }) {
   const href = mapHref(punch);
+  const dist = typeof punch?.distanceM === "number" ? punch.distanceM : null;
   return (
     <span className="inline-flex items-center gap-1 text-gray-700">
       {fmtTime(punch?.at)}
@@ -23,6 +26,11 @@ function TimeCell({ punch }: { punch?: { at?: string; lat?: number; lng?: number
         <a href={href} target="_blank" rel="noopener noreferrer" title="View location on map" className="text-amber-600 hover:text-amber-700">
           <MapPin className="w-3.5 h-3.5" />
         </a>
+      )}
+      {dist !== null && (
+        <span className="text-[11px] text-gray-400" title="Distance from assigned site at punch time">
+          {dist} m
+        </span>
       )}
     </span>
   );

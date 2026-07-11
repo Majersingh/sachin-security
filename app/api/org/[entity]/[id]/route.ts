@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getCollection } from "@/app/lib/db";
-import { getOrgConfig } from "@/app/lib/org";
+import { getOrgConfig, readGeo, readNumber, readBoolean } from "@/app/lib/org";
 import { requirePermission } from "@/app/lib/apiAuth";
 
 function parseId(id: string): ObjectId | null {
@@ -33,6 +33,39 @@ export async function PATCH(
   const update: Record<string, any> = {};
 
   for (const field of config.fields) {
+    if (field.generated) continue; // never updated from the form
+    if (field.type === "geo") {
+      // Update lat/lng only when the client sends them (either both or neither).
+      if ("lat" in body || "lng" in body) {
+        const g = readGeo(body);
+        if (field.required && !g) {
+          return NextResponse.json({ success: false, error: `${field.label} is required` }, { status: 400 });
+        }
+        // Empty strings clear the coordinates; a valid pair sets them.
+        if (g) {
+          update.lat = g.lat;
+          update.lng = g.lng;
+        } else if (body.lat === "" && body.lng === "") {
+          update.lat = null;
+          update.lng = null;
+        }
+      }
+      continue;
+    }
+    if (field.type === "number") {
+      if (field.key in body) {
+        const n = readNumber(body[field.key]);
+        if (field.required && n === null) {
+          return NextResponse.json({ success: false, error: `${field.label} is required` }, { status: 400 });
+        }
+        update[field.key] = n; // null clears it
+      }
+      continue;
+    }
+    if (field.type === "boolean") {
+      if (field.key in body) update[field.key] = readBoolean(body[field.key], field.default ?? false);
+      continue;
+    }
     if (field.key in body) {
       const value = typeof body[field.key] === "string" ? body[field.key].trim() : body[field.key];
       if (field.required && !value) {

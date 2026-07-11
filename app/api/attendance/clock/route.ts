@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { getCollection } from "@/app/lib/db";
 import { requirePermission } from "@/app/lib/apiAuth";
-import { istDateString, computeStatus, isValidGeo } from "@/app/lib/attendance";
+import { istDateString, computeStatus, isValidGeo, evaluateGeofence } from "@/app/lib/attendance";
 
 export async function POST(request: Request) {
   const perm = await requirePermission("attendance:write:self");
@@ -29,9 +29,42 @@ export async function POST(request: Request) {
     );
   }
 
+  // Geofence check: the punch must be within the assigned site's radius.
+  // A guard's site is `employee.workLocation` (a location name); we look up that
+  // location's coordinates. If the site has no coordinates configured we cannot
+  // enforce a fence, so the punch is allowed (distanceM stays null).
+  const employees = await getCollection("employees");
+  const employee = await employees.findOne(
+    { employeeId },
+    { projection: { workLocation: 1 } }
+  );
+  const workLocation = typeof employee?.workLocation === "string" ? employee.workLocation.trim() : "";
+
+  type Site = { lat?: unknown; lng?: unknown; geofenceRadiusM?: unknown; geofenceEnabled?: unknown; name?: string };
+  let site: Site | null = null;
+  if (workLocation) {
+    const locations = await getCollection("locations");
+    site = (await locations.findOne(
+      { name: { $regex: `^${escapeRegex(workLocation)}$`, $options: "i" }, active: { $ne: false } },
+      { projection: { lat: 1, lng: 1, geofenceRadiusM: 1, geofenceEnabled: 1, name: 1 } }
+    )) as Site | null;
+  }
+
+  const fence = evaluateGeofence(site, lat, lng, typeof accuracy === "number" ? accuracy : null);
+  if (!fence.ok) {
+    return NextResponse.json({ success: false, error: fence.reason || "You are not at your assigned site." }, { status: 403 });
+  }
+
   const date = istDateString();
   const now = new Date();
-  const punch = { at: now, lat, lng, accuracy: typeof accuracy === "number" ? accuracy : null };
+  const punch = {
+    at: now,
+    lat,
+    lng,
+    accuracy: typeof accuracy === "number" ? accuracy : null,
+    distanceM: fence.distanceM,
+    siteName: site?.name || workLocation || null,
+  };
 
   const collection = await getCollection("attendance");
   const existing = await collection.findOne({ employeeId, date });
@@ -67,4 +100,8 @@ export async function POST(request: Request) {
   );
   const record = await collection.findOne({ employeeId, date });
   return NextResponse.json({ success: true, message: "Clocked out", data: record });
+}
+
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
