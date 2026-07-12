@@ -20,7 +20,8 @@ import {
   FileText,
   Settings,
   ExternalLink,
-  UserCog
+  UserCog,
+  Wallet
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -58,13 +59,14 @@ const navItems = [
   { name: 'Reporting', icon: Network, path: '/admin/reporting' },
   { name: 'Attendance', icon: CalendarCheck, path: '/admin/attendance' },
   { name: 'Leave', icon: CalendarClock, path: '/admin/leave' },
+  { name: 'Payroll', icon: Wallet, path: '/admin/payroll', roles: ['admin', 'hr'] },
   { name: 'Documents', icon: FileText, path: '/admin/documents' },
   { name: 'Settings', icon: Settings, path: '/admin/settings' },
   { name: 'User Management', icon: UserCog, path: '/admin/users', adminOnly: true },
   { name: 'Support Ticket', icon: Search, path: '/admin/support-messages' },
   { name: 'Employee Portal', icon: ExternalLink, path: '/portal' },
 
-].filter((item) => !item.adminOnly || role === 'admin');
+].filter((item) => (!item.adminOnly || role === 'admin') && (!item.roles || (role != null && item.roles.includes(role))));
 
   // The login page is standalone — it must not render the admin sidebar/nav chrome.
   if (pathname === '/admin/login') {

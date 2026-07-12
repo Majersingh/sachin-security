@@ -16,7 +16,6 @@ interface Employee {
   joiningDate: string;
   mobileNumber: string;
   email: string;
-  aadharNumber: string;
   panNumber: string;
   status: string;
   workLocation: string;
@@ -24,7 +23,7 @@ interface Employee {
 
 export default function SearchEmployeePage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchBy, setSearchBy] = useState<'name' | 'aadharNumber'>('name');
+  const [searchBy, setSearchBy] = useState<'name' | 'employeeId'>('name');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -236,12 +235,12 @@ export default function SearchEmployeePage() {
               <input
                 type="radio"
                 name="searchBy"
-                value="id"
-                checked={searchBy === 'aadharNumber'}
-                onChange={(e) => setSearchBy('aadharNumber')}
+                value="employeeId"
+                checked={searchBy === 'employeeId'}
+                onChange={(e) => setSearchBy('employeeId')}
                 className="w-4 h-4 text-amber-600 focus:ring-amber-500"
               />
-              <span className="text-gray-700 font-medium">Search by Aadhar No.</span>
+              <span className="text-gray-700 font-medium">Search by Employee ID</span>
             </label>
           </div>
 
@@ -600,7 +599,7 @@ function EmployeeDetailsModal({
           {/* Address Details */}
           <Section title="Address Details">
             <DetailRow label="Current Address" value={employee.currentAddress} />
-            <DetailRow label="Permanent Address as per Aadhar" value={employee.permanentAddress} />
+            <DetailRow label="Permanent Address" value={employee.permanentAddress} />
             <DetailRow label="City" value={employee.city} />
             <DetailRow label="State" value={employee.state} />
             <DetailRow label="Pincode" value={employee.pincode} />
@@ -753,7 +752,6 @@ function DownloadEmppdf({
       addRow('Designation', employee.designation);
       addRow('Department', employee.department);
       addRow('Joining Date', employee.joiningDate);
-      addRow('Aadhar No.', employee.aadharNumber);
       addRow('PAN', employee.panNumber);
       addRow('PF Number', employee.pfNumber);
       addRow('UAN', employee.uanNumber);

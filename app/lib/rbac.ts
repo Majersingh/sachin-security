@@ -28,6 +28,9 @@ export type Permission =
   // Documents
   | "documents:read:self"
   | "documents:manage"
+  // Payroll (salary structures + payslips) — sensitive; admin/HR only
+  | "payroll:read"
+  | "payroll:manage"
   // Users & roles
   | "users:read"
   | "users:manage"
@@ -49,6 +52,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "leave:approve:team",
     "documents:read:self",
     "documents:manage",
+    "payroll:read",
+    "payroll:manage",
     "users:read",
     "users:manage",
     "notifications:read",
