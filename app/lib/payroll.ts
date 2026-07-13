@@ -31,6 +31,7 @@ export interface SalaryComponent {
   percent?: number; // for calc "percentOf"
   baseKey?: string; // for calc "percentOf": component to take % of
   autoFromAttendance?: "duty" | "extraDuty"; // pre-fill this info value from attendance
+  autoFromLocation?: "rate" | "ratePerDay"; // resolve this value live from the location rate card
 }
 
 export interface SalaryStructure {
@@ -57,6 +58,8 @@ export interface Payslip {
   employeeName: string;
   workLocation: string;
   designation: string;
+  uanNumber?: string; // UAN, shown on the slip when available
+  esiNumber?: string; // ESI number, shown on the slip when available
   month: string; // "YYYY-MM"
   dutyDays: number;
   extraDutyDays: number;
@@ -73,9 +76,11 @@ export interface Payslip {
 // removable and reorderable in the UI. Percentages/amounts here are sensible
 // starting points, NOT legal advice — confirm statutory rates for your org.
 export const DEFAULT_PAYROLL_TEMPLATE: SalaryComponent[] = [
-  // Base inputs (not summed into gross; feed the formulas below)
-  { key: "rate", label: "Rate", category: "info", calc: "fixed", amount: 0 },
-  { key: "ratePerDay", label: "Rate Per Day", category: "info", calc: "fixed", amount: 0 },
+  // Base inputs (not summed into gross; feed the formulas below).
+  // Rate / Rate Per Day are resolved live from the employee's location rate card
+  // (by designation) at compute time — they are never hardcoded into the structure.
+  { key: "rate", label: "Rate", category: "info", calc: "fixed", amount: 0, autoFromLocation: "rate" },
+  { key: "ratePerDay", label: "Rate Per Day", category: "info", calc: "fixed", amount: 0, autoFromLocation: "ratePerDay" },
   { key: "duty", label: "Duty (days)", category: "info", calc: "fixed", amount: 0, autoFromAttendance: "duty" },
   { key: "extraDuty", label: "Extra Duty (days)", category: "info", calc: "fixed", amount: 0, autoFromAttendance: "extraDuty" },
 
@@ -137,23 +142,48 @@ export function computePayroll(
       values[c.key] = key(overrides, c.key) ?? round2(val(c.rateKey) * val(c.daysKey));
     }
   }
-  // Pass 3: percentage of another component.
-  for (const c of components) {
-    if (c.calc === "percentOf") {
-      values[c.key] = key(overrides, c.key) ?? round2((val(c.baseKey) * num(c.percent)) / 100);
-    }
-  }
-  // Pass 4: category sums.
+
+  // Pass 3+: percentage-of and category totals resolve together via a fixpoint.
+  // A "% of" component may reference a total (e.g. ESIC = 0.75% of Gross Pay), and
+  // a total sums components that may include "% of" lines — so a single ordered pass
+  // can't satisfy both. Instead we recompute both until nothing changes, which lets
+  // Gross Pay settle before the deductions that depend on it are taken.
   const sum = (cat: ComponentCategory) =>
     round2(components.filter((c) => c.category === cat).reduce((t, c) => t + val(c.key), 0));
-  const grossPay = sum("earning");
-  const totalDeduction = sum("deduction");
-  const netPay = round2(grossPay - totalDeduction);
 
-  for (const c of components) {
-    if (c.calc === "sumEarnings") values[c.key] = grossPay;
-    else if (c.calc === "sumDeductions") values[c.key] = totalDeduction;
-    else if (c.calc === "net") values[c.key] = netPay;
+  let grossPay = 0;
+  let totalDeduction = 0;
+  let netPay = 0;
+
+  // Bounded by the component count (each pass can settle at least one dependency);
+  // the +2 covers the trailing gross/deduction/net totals.
+  const maxPasses = components.length + 2;
+  for (let pass = 0; pass < maxPasses; pass++) {
+    let changed = false;
+    const set = (k: string, next: number) => {
+      if (values[k] !== next) {
+        values[k] = next;
+        changed = true;
+      }
+    };
+
+    for (const c of components) {
+      if (c.calc === "percentOf") {
+        set(c.key, key(overrides, c.key) ?? round2((val(c.baseKey) * num(c.percent)) / 100));
+      }
+    }
+
+    grossPay = sum("earning");
+    totalDeduction = sum("deduction");
+    netPay = round2(grossPay - totalDeduction);
+
+    for (const c of components) {
+      if (c.calc === "sumEarnings") set(c.key, grossPay);
+      else if (c.calc === "sumDeductions") set(c.key, totalDeduction);
+      else if (c.calc === "net") set(c.key, netPay);
+    }
+
+    if (!changed) break;
   }
 
   return { values, grossPay, totalDeduction, netPay };
@@ -192,8 +222,20 @@ export function sanitizeComponents(input: unknown): SalaryComponent[] {
     )
       ? (r.calc as CalcType)
       : "fixed";
+    const finalKey = typeof r.key === "string" && r.key ? r.key : k;
+    // Backfill the location-rate marker for the well-known base keys so structures
+    // saved before this feature existed still resolve Rate / Rate Per Day live from
+    // the location card instead of using a stored (typed) amount.
+    const autoFromLocation: SalaryComponent["autoFromLocation"] =
+      r.autoFromLocation === "rate" || r.autoFromLocation === "ratePerDay"
+        ? r.autoFromLocation
+        : finalKey === "rate"
+        ? "rate"
+        : finalKey === "ratePerDay"
+        ? "ratePerDay"
+        : undefined;
     out.push({
-      key: typeof r.key === "string" && r.key ? r.key : k,
+      key: finalKey,
       label,
       category,
       calc,
@@ -206,6 +248,7 @@ export function sanitizeComponents(input: unknown): SalaryComponent[] {
         r.autoFromAttendance === "duty" || r.autoFromAttendance === "extraDuty"
           ? r.autoFromAttendance
           : undefined,
+      autoFromLocation,
     });
   }
   return out;

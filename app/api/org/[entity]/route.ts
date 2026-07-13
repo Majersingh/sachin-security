@@ -2,7 +2,7 @@
 // List + create for any Organization Structure entity, driven by ORG_CONFIGS.
 import { NextRequest, NextResponse } from "next/server";
 import { getCollection } from "@/app/lib/db";
-import { getOrgConfig, readGeo, readNumber, readBoolean, codePrefix } from "@/app/lib/org";
+import { getOrgConfig, readGeo, readNumber, readBoolean, readRates, codePrefix } from "@/app/lib/org";
 import { requirePermission } from "@/app/lib/apiAuth";
 import type { Collection } from "mongodb";
 
@@ -68,6 +68,10 @@ export async function POST(
     }
     if (field.type === "boolean") {
       doc[field.key] = readBoolean(body[field.key], field.default ?? false);
+      continue;
+    }
+    if (field.type === "rateTable") {
+      doc[field.key] = readRates(body[field.key]);
       continue;
     }
     const value = typeof body[field.key] === "string" ? body[field.key].trim() : body[field.key];

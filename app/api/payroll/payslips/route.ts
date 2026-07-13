@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCollection } from "@/app/lib/db";
 import { requirePermission } from "@/app/lib/apiAuth";
 import { computePayroll, sanitizeComponents, type PayslipLine, type SalaryComponent } from "@/app/lib/payroll";
+import { resolveLocationRate } from "@/app/lib/locationRate";
 
 // Count duty days from attendance for a month: Present = 1, Half Day = 0.5.
 async function dutyFromAttendance(employeeId: string, month: string) {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
   const employees = await getCollection("employees");
   const employee = await employees.findOne(
     { employeeId },
-    { projection: { _id: 0, employeeId: 1, fullName: 1, workLocation: 1, designation: 1 } }
+    { projection: { _id: 0, employeeId: 1, fullName: 1, workLocation: 1, designation: 1, uanNumber: 1, esiNumber: 1 } }
   );
   if (!employee) return NextResponse.json({ success: false, error: "Employee not found" }, { status: 404 });
 
@@ -89,6 +90,17 @@ export async function POST(request: NextRequest) {
     if (overridable.has(k)) overrides[k] = v; // ignore attempts to override derived lines
   }
 
+  // Resolve Rate / Rate Per Day live from the location rate card (by designation)
+  // and apply last, so the payslip always reflects the current location salary
+  // rather than any value stored on the structure.
+  const locationRate = await resolveLocationRate(employee);
+  if (locationRate) {
+    for (const c of components) {
+      if (c.autoFromLocation === "rate") overrides[c.key] = locationRate.rate;
+      if (c.autoFromLocation === "ratePerDay") overrides[c.key] = locationRate.ratePerDay;
+    }
+  }
+
   const { values, grossPay, totalDeduction, netPay } = computePayroll(components, overrides);
   const lines: PayslipLine[] = components.map((c) => ({
     key: c.key,
@@ -107,6 +119,8 @@ export async function POST(request: NextRequest) {
     employeeName: employee.fullName || "",
     workLocation: employee.workLocation || "",
     designation: employee.designation || "",
+    uanNumber: employee.uanNumber || "",
+    esiNumber: employee.esiNumber || "",
     month,
     dutyDays: dutyKey ? values[dutyKey] ?? dutyDays : dutyDays,
     extraDutyDays: extraDutyKey ? values[extraDutyKey] ?? 0 : 0,

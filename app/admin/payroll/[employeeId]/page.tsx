@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, use } from "react";
 import Link from "next/link";
 import {
-  Loader2, ArrowLeft, Plus, Trash2, ArrowUp, ArrowDown, Save, FileText, Download, Calculator,
+  Loader2, ArrowLeft, Plus, Trash2, ArrowUp, ArrowDown, Save, FileText, Download, Calculator, MapPin,
 } from "lucide-react";
 import {
   computePayroll, formatINR, amountInWords,
@@ -37,6 +37,7 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
 
   const [employee, setEmployee] = useState<any>(null);
   const [components, setComponents] = useState<SalaryComponent[]>([]);
+  const [locationRate, setLocationRate] = useState<{ rate: number; ratePerDay: number } | null>(null);
   const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,6 +73,7 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
       if (data.success) {
         setEmployee(data.employee);
         setComponents(data.structure.components || []);
+        setLocationRate(data.locationRate ?? null);
         setIsDefault(!!data.structure.isDefault);
         // Send admins straight to config when nothing is set up yet.
         if (data.structure.isDefault) setTab("config");
@@ -99,8 +101,21 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
 
   const dutyDays = attSummary ? attSummary.present + attSummary.halfDay * 0.5 : 0;
 
+  // Rate / Rate Per Day are resolved live from the location rate card, never stored.
+  // Feed them into the live computation as overrides so the config preview shows the
+  // real location salary (and everything derived from it, e.g. Basic, PF).
+  const locationOverrides = useMemo(() => {
+    const o: Record<string, number> = {};
+    if (!locationRate) return o;
+    for (const c of components) {
+      if (c.autoFromLocation === "rate") o[c.key] = locationRate.rate;
+      if (c.autoFromLocation === "ratePerDay") o[c.key] = locationRate.ratePerDay;
+    }
+    return o;
+  }, [components, locationRate]);
+
   // Live computation for the preview column + totals.
-  const computed = useMemo(() => computePayroll(components), [components]);
+  const computed = useMemo(() => computePayroll(components, locationOverrides), [components, locationOverrides]);
 
   const keyOptions = components.map((c) => ({ key: c.key, label: c.label }));
 
@@ -264,6 +279,22 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
           </div>
         </div>
 
+        {/* Location salary — resolved live from the site rate card by designation. */}
+        <div className={`mb-4 rounded-lg px-3 py-2 text-sm border ${locationRate ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+          <MapPin className="w-4 h-4 inline-block mr-1 -mt-0.5" />
+          {locationRate ? (
+            <>
+              Auto-filled from location salary
+              {employee?.workLocation ? ` (${employee.workLocation}` : ""}
+              {employee?.designation ? ` · ${employee.designation})` : employee?.workLocation ? ")" : ""}:
+              {" "}<b>Rate {formatINR(locationRate.rate)}</b> · <b>Rate/Day {formatINR(locationRate.ratePerDay)}</b>
+            </>
+          ) : (
+            <>No location salary found for {employee?.designation ? `“${employee.designation}”` : "this designation"}
+              {employee?.workLocation ? ` at ${employee.workLocation}` : ""}. Set a rate card for the location under Organisation → Locations.</>
+          )}
+        </div>
+
         <div className="overflow-x-auto border border-gray-200 rounded-lg">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -310,6 +341,8 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
                           className="w-16 px-2 py-1 border border-gray-300 rounded" /> %
                         <KeySelect label="of" value={c.baseKey} options={keyOptions} exclude={c.key} onChange={(v) => patch(idx, { baseKey: v })} />
                       </div>
+                    ) : c.autoFromLocation ? (
+                      <span className="text-xs text-amber-600">auto-filled from location salary</span>
                     ) : c.calc === "fixed" ? (
                       <span className="text-xs text-gray-400">{c.autoFromAttendance ? `auto: ${c.autoFromAttendance} from attendance` : "typed amount"}</span>
                     ) : (
@@ -317,7 +350,19 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {c.calc === "fixed" ? (
+                    {c.autoFromLocation ? (
+                      <span className={`inline-block px-2 py-0.5 rounded ${catColor[c.category]}`} title="Resolved live from the location rate card">
+                        {formatINR(computed.values[c.key] ?? 0)}
+                      </span>
+                    ) : c.calc === "fixed" && c.autoFromAttendance ? (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <input type="number" value={c.amount ?? 0} onChange={(e) => patch(idx, { amount: parseFloat(e.target.value) || 0 })}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-right" />
+                        <span className="text-[10px] text-gray-400" title="On a real payslip this comes from attendance (and the Extra Duty field). This value only affects the preview.">
+                          preview only
+                        </span>
+                      </div>
+                    ) : c.calc === "fixed" ? (
                       <input type="number" value={c.amount ?? 0} onChange={(e) => patch(idx, { amount: parseFloat(e.target.value) || 0 })}
                         className="w-24 px-2 py-1 border border-gray-300 rounded text-right" />
                     ) : (
@@ -383,7 +428,7 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
           <details className="mb-4 border border-gray-200 rounded-lg">
             <summary className="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 select-none">Adjust amounts for this month</summary>
             <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-gray-100">
-              {components.filter((c) => c.calc === "fixed" && !c.autoFromAttendance).map((c) => (
+              {components.filter((c) => c.calc === "fixed" && !c.autoFromAttendance && !c.autoFromLocation).map((c) => (
                 <label key={c.key} className="text-xs text-gray-500">
                   {c.label}
                   <input type="number" value={edits[c.key] ?? ""} placeholder={String(c.amount ?? 0)}
@@ -554,6 +599,8 @@ function PayslipDocument({ payslip: p, company }: { payslip: Payslip; company: a
         <InfoRow k="Employee ID" v={p.employeeId} />
         <InfoRow k="Designation" v={p.designation || "—"} />
         <InfoRow k="Work Location" v={p.workLocation || "—"} />
+        {p.uanNumber && <InfoRow k="UAN No." v={p.uanNumber} />}
+        {p.esiNumber && <InfoRow k="ESI No." v={p.esiNumber} />}
         <InfoRow k="Duty Days" v={String(p.dutyDays)} />
         <InfoRow k="Extra Duty" v={String(p.extraDutyDays)} />
         <InfoRow k="Ref No." v={p.refId} />

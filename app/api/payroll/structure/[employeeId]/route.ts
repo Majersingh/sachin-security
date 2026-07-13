@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCollection } from "@/app/lib/db";
 import { requirePermission } from "@/app/lib/apiAuth";
 import { DEFAULT_PAYROLL_TEMPLATE, sanitizeComponents } from "@/app/lib/payroll";
+import { resolveLocationRate } from "@/app/lib/locationRate";
 
 async function loadEmployee(employeeId: string) {
   const employees = await getCollection("employees");
@@ -26,11 +27,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ emp
   const structures = await getCollection("salaryStructures");
   const existing = await structures.findOne({ employeeId });
 
+  // The location rate card (by designation) is resolved live — Rate / Rate Per Day
+  // are never stored on the structure; they always reflect the current location salary.
+  const locationRate = await resolveLocationRate(employee);
+
   return NextResponse.json({
     success: true,
     employee,
+    locationRate,
     structure: existing
-      ? { ...existing, _id: String(existing._id) }
+      ? { ...existing, _id: String(existing._id), components: sanitizeComponents(existing.components) }
       : { employeeId, components: DEFAULT_PAYROLL_TEMPLATE, isDefault: true },
   });
 }

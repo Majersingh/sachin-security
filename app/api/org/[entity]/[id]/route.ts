@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getCollection } from "@/app/lib/db";
-import { getOrgConfig, readGeo, readNumber, readBoolean } from "@/app/lib/org";
+import { getOrgConfig, readGeo, readNumber, readBoolean, readRates } from "@/app/lib/org";
 import { requirePermission } from "@/app/lib/apiAuth";
 
 function parseId(id: string): ObjectId | null {
@@ -64,6 +64,10 @@ export async function PATCH(
     }
     if (field.type === "boolean") {
       if (field.key in body) update[field.key] = readBoolean(body[field.key], field.default ?? false);
+      continue;
+    }
+    if (field.type === "rateTable") {
+      if (field.key in body) update[field.key] = readRates(body[field.key]);
       continue;
     }
     if (field.key in body) {

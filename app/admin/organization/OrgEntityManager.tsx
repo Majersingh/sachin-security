@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Plus, Pencil, X, Users, Trash2, MapPin, LocateFixed, Navigation } from "lucide-react";
-import { ORG_CONFIGS, type OrgEntity } from "@/app/lib/org";
+import { ORG_CONFIGS, type OrgEntity, type RateRow } from "@/app/lib/org";
 import { parseLatLng } from "@/app/lib/attendance";
 import EmployeeCombobox from "@/app/components/EmployeeCombobox";
 
@@ -17,8 +17,12 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
+  // Rate-card rows are an array (not a plain string field), so they live outside `form`.
+  const [rateRows, setRateRows] = useState<RateRow[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const rateField = config.fields.find((f) => f.type === "rateTable");
 
   // Team membership (only used when entity === "teams").
   const [membersTeam, setMembersTeam] = useState<any | null>(null);
@@ -26,7 +30,7 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
   const [membersLoading, setMembersLoading] = useState(false);
   const [memberBusy, setMemberBusy] = useState(false);
 
-  const columns = config.fields.filter((f) => f.type !== "textarea");
+  const columns = config.fields.filter((f) => f.type !== "textarea" && f.type !== "rateTable");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,7 +44,7 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
   }, [entity]);
 
   const loadRefs = useCallback(async () => {
-    const refFields = config.fields.filter((f) => f.type === "ref" && f.refEntity);
+    const refFields = config.fields.filter((f) => (f.type === "ref" || f.type === "rateTable") && f.refEntity);
     const out: Record<string, string[]> = {};
     await Promise.all(
       refFields.map(async (f) => {
@@ -61,6 +65,7 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
   const openAdd = () => {
     setEditing(null);
     setForm({});
+    setRateRows([]);
     setError("");
     setShowForm(true);
   };
@@ -77,11 +82,14 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
         // Stored as a real boolean; fall back to the field default when unset.
         const v = item[fl.key];
         f[fl.key] = (typeof v === "boolean" ? v : fl.default ?? false) ? "true" : "false";
+      } else if (fl.type === "rateTable") {
+        // Rate rows are handled in their own array state, not in `form`.
       } else {
         f[fl.key] = item[fl.key] ?? "";
       }
     });
     setForm(f);
+    setRateRows(rateField && Array.isArray(item[rateField.key]) ? item[rateField.key] : []);
     setError("");
     setShowForm(true);
   };
@@ -93,10 +101,11 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
     try {
       const url = editing ? `/api/org/${entity}/${editing._id}` : `/api/org/${entity}`;
       const method = editing ? "PATCH" : "POST";
+      const payload = rateField ? { ...form, [rateField.key]: rateRows } : form;
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -319,6 +328,12 @@ export default function OrgEntityManager({ entity }: { entity: OrgEntity }) {
                       lng={form.lng ?? ""}
                       address={form.address ?? ""}
                       onChange={(lat, lng) => setForm((prev) => ({ ...prev, lat, lng }))}
+                    />
+                  ) : field.type === "rateTable" ? (
+                    <RateTableEditor
+                      rows={rateRows}
+                      designations={refOptions[field.key] ?? []}
+                      onChange={setRateRows}
                     />
                   ) : field.type === "number" ? (
                     <>
@@ -565,6 +580,96 @@ function GeoPicker({
       )}
 
       {msg && <p className="text-xs text-red-600">{msg}</p>}
+    </div>
+  );
+}
+
+// Edit a location's rate card: one { designation, rate, ratePerDay } row per posting.
+// Designations come from the Designations entity; each may appear at most once.
+function RateTableEditor({
+  rows,
+  designations,
+  onChange,
+}: {
+  rows: RateRow[];
+  designations: string[];
+  onChange: (rows: RateRow[]) => void;
+}) {
+  const used = new Set(rows.map((r) => r.designation));
+  const available = designations.filter((d) => !used.has(d));
+
+  const addRow = () =>
+    onChange([...rows, { designation: available[0] ?? "", rate: 0, ratePerDay: 0 }]);
+
+  const patch = (idx: number, p: Partial<RateRow>) =>
+    onChange(rows.map((r, i) => (i === idx ? { ...r, ...p } : r)));
+
+  const remove = (idx: number) => onChange(rows.filter((_, i) => i !== idx));
+
+  if (designations.length === 0) {
+    return (
+      <p className="text-xs text-gray-500 border border-gray-200 rounded-lg px-3 py-2">
+        Add Designations first to build a rate card.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {rows.length > 0 && (
+        <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+          <div className="grid grid-cols-[1fr_5.5rem_5.5rem_2rem] gap-2 px-2 py-1.5 bg-gray-50 text-xs font-semibold text-gray-600">
+            <span>Designation</span>
+            <span className="text-right">Rate</span>
+            <span className="text-right">Rate/Day</span>
+            <span></span>
+          </div>
+          {rows.map((r, idx) => (
+            <div key={idx} className="grid grid-cols-[1fr_5.5rem_5.5rem_2rem] gap-2 px-2 py-1.5 items-center">
+              <select
+                value={r.designation}
+                onChange={(e) => patch(idx, { designation: e.target.value })}
+                className="px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                {/* Keep the current value selectable even though it's "used". */}
+                {[r.designation, ...available].filter(Boolean).map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={0}
+                value={r.rate}
+                onChange={(e) => patch(idx, { rate: parseFloat(e.target.value) || 0 })}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right text-gray-900"
+              />
+              <input
+                type="number"
+                min={0}
+                value={r.ratePerDay}
+                onChange={(e) => patch(idx, { ratePerDay: parseFloat(e.target.value) || 0 })}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right text-gray-900"
+              />
+              <button
+                type="button"
+                onClick={() => remove(idx)}
+                className="p-1 hover:bg-red-50 rounded justify-self-center"
+                title="Remove"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={addRow}
+        disabled={available.length === 0}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+      >
+        <Plus className="w-4 h-4" /> Add designation rate
+      </button>
     </div>
   );
 }

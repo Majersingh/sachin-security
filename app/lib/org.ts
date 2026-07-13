@@ -9,7 +9,14 @@ export type OrgEntity =
   | "branches"
   | "locations";
 
-export type OrgFieldType = "text" | "textarea" | "select" | "ref" | "number" | "geo" | "boolean";
+export type OrgFieldType = "text" | "textarea" | "select" | "ref" | "number" | "geo" | "boolean" | "rateTable";
+
+// A single row of a location's rate card: the pay rates for one designation.
+export interface RateRow {
+  designation: string;
+  rate: number; // monthly / base rate
+  ratePerDay: number; // per-day rate (feeds Basic = ratePerDay × duty)
+}
 
 export interface OrgField {
   key: string;
@@ -17,7 +24,7 @@ export interface OrgField {
   type: OrgFieldType;
   required?: boolean;
   options?: string[]; // for type "select"
-  refEntity?: OrgEntity; // for type "ref": dropdown sourced from another entity
+  refEntity?: OrgEntity; // for type "ref" (and "rateTable"): options sourced from another entity
   generated?: boolean; // value is auto-generated server-side; hidden from the form
   default?: boolean; // for type "boolean": value used when the field is absent
   hint?: string; // small helper text shown under the field
@@ -108,6 +115,15 @@ export const ORG_CONFIGS: Record<OrgEntity, OrgEntityConfig> = {
       },
       { key: "coordinates", label: "Site GPS Location", type: "geo" },
       { key: "geofenceRadiusM", label: "Allowed Radius (metres)", type: "number" },
+      // Rate card: pay rates per designation for staff posted at this site. These
+      // pre-fill an employee's payroll Rate / Rate Per Day from their designation.
+      {
+        key: "rates",
+        label: "Rate Card (per designation)",
+        type: "rateTable",
+        refEntity: "designations",
+        hint: "Set Rate and Rate/Day for each designation posted here. Payroll auto-fills from this based on the employee's designation.",
+      },
     ],
   },
 };
@@ -140,6 +156,25 @@ export function readBoolean(value: unknown, dflt = false): boolean {
 export function codePrefix(name: string): string {
   const clean = String(name).replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 4);
   return clean || "LOC";
+}
+
+// Validate/normalize a rate-card array coming from the client. Keeps one row per
+// designation (last wins), drops rows without a designation, coerces the two rates.
+export function readRates(value: unknown): RateRow[] {
+  if (!Array.isArray(value)) return [];
+  const byDesignation = new Map<string, RateRow>();
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw as Record<string, unknown>;
+    const designation = String(r.designation ?? "").trim();
+    if (!designation) continue;
+    byDesignation.set(designation, {
+      designation,
+      rate: readNumber(r.rate) ?? 0,
+      ratePerDay: readNumber(r.ratePerDay) ?? 0,
+    });
+  }
+  return [...byDesignation.values()];
 }
 
 // Read a { lat, lng } pair from a request body; returns null if absent/invalid.
