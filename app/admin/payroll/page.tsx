@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, Search, ChevronLeft, ChevronRight, Wallet, Settings2 } from "lucide-react";
+import { Loader2, Search, ChevronLeft, ChevronRight, Wallet, Settings2, FileSpreadsheet } from "lucide-react";
+import { istMonthString } from "@/app/lib/attendance";
 
 interface EmployeeRow {
   employeeId: string;
@@ -18,6 +19,7 @@ export default function PayrollListPage() {
   const [search, setSearch] = useState("");
   const [workLocation, setWorkLocation] = useState("");
   const [locations, setLocations] = useState<string[]>([]);
+  const [exportMonth, setExportMonth] = useState(istMonthString());
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -94,6 +96,28 @@ export default function PayrollListPage() {
               <option key={l} value={l}>{l}</option>
             ))}
           </select>
+
+          {/* Export a location-wise payroll register (one worksheet per location). */}
+          <div className="flex items-center gap-2 ml-auto">
+            <input
+              type="month"
+              value={exportMonth}
+              onChange={(e) => setExportMonth(e.target.value)}
+              title="Month for the attendance tally in the export"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <button
+              onClick={() => {
+                const p = new URLSearchParams({ month: exportMonth });
+                if (workLocation) p.set("workLocation", workLocation);
+                window.location.href = `/api/payroll/export?${p.toString()}`;
+              }}
+              title={workLocation ? `Export ${workLocation} as Excel` : "Export all locations — one worksheet each"}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-800 whitespace-nowrap"
+            >
+              <FileSpreadsheet className="w-4 h-4" /> Export Excel
+            </button>
+          </div>
         </div>
 
         {loading ? (

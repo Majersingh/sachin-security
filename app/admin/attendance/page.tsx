@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, MapPin, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, MapPin, Search, ChevronLeft, ChevronRight, FileSpreadsheet } from "lucide-react";
 import { istDateString, istMonthString, formatWorked } from "@/app/lib/attendance";
 import EmployeeCombobox from "@/app/components/EmployeeCombobox";
 
@@ -222,6 +222,17 @@ export default function AdminAttendancePage() {
               onChange={(e) => setMonth(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
+            <button
+              onClick={() => {
+                if (!employeeId) return;
+                window.location.href = `/api/attendance/export?employeeId=${encodeURIComponent(employeeId)}&month=${month}`;
+              }}
+              disabled={!employeeId}
+              title={employeeId ? "Download this month as a colour-coded Excel calendar" : "Select an employee first"}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FileSpreadsheet className="w-4 h-4" /> Export Excel
+            </button>
           </div>
 
           {monthData?.summary && (
