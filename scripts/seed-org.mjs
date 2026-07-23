@@ -1,4 +1,4 @@
-// scripts/seed-org.mjs
+// scripts/seed-org.mj s
 // Seeds starter Organization Structure data (departments, designations, teams,
 // branches, locations) so the /admin/organization UI has content immediately.
 // Docs are tagged { seededOrg: true } for easy cleanup.
