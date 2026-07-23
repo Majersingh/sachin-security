@@ -15,14 +15,33 @@ const CATEGORIES: { value: ComponentCategory; label: string }[] = [
   { value: "deduction", label: "Deduction" },
   { value: "total", label: "Total (auto)" },
 ];
-const CALCS: { value: CalcType; label: string }[] = [
+// The calculation dropdown offers the real CalcTypes plus four "auto" modes that
+// are really calc:"fixed" + an autoFromLocation/autoFromAttendance marker. modeOf()
+// and setMode() translate between this dropdown value and the stored component.
+type CalcMode = CalcType | "autoRate" | "autoRatePerDay" | "autoDuty" | "autoExtraDuty";
+const CALC_OPTIONS: { value: CalcMode; label: string }[] = [
   { value: "fixed", label: "Fixed amount" },
   { value: "perDay", label: "Per day (rate × days)" },
   { value: "percentOf", label: "% of another" },
   { value: "sumEarnings", label: "Σ Earnings (Gross)" },
   { value: "sumDeductions", label: "Σ Deductions" },
   { value: "net", label: "Net (Gross − Deductions)" },
+  { value: "autoRate", label: "Auto: Rate (from location)" },
+  { value: "autoRatePerDay", label: "Auto: Rate/Day (from location)" },
+  { value: "autoDuty", label: "Auto: Duty days (from attendance)" },
+  { value: "autoExtraDuty", label: "Auto: Extra Duty days (from attendance)" },
 ];
+
+const modeOf = (c: SalaryComponent): CalcMode =>
+  c.autoFromLocation === "rate"
+    ? "autoRate"
+    : c.autoFromLocation === "ratePerDay"
+    ? "autoRatePerDay"
+    : c.autoFromAttendance === "duty"
+    ? "autoDuty"
+    : c.autoFromAttendance === "extraDuty"
+    ? "autoExtraDuty"
+    : c.calc;
 
 const catColor: Record<ComponentCategory, string> = {
   info: "bg-slate-100 text-slate-700",
@@ -121,6 +140,17 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
 
   const patch = (idx: number, p: Partial<SalaryComponent>) =>
     setComponents((prev) => prev.map((c, i) => (i === idx ? { ...c, ...p } : c)));
+
+  // Apply a calculation-dropdown choice, translating the "auto" modes into a
+  // fixed component carrying the right auto marker (and clearing stale markers).
+  const setMode = (idx: number, mode: CalcMode) => {
+    const clear = { autoFromLocation: undefined, autoFromAttendance: undefined };
+    if (mode === "autoRate") patch(idx, { ...clear, calc: "fixed", autoFromLocation: "rate" });
+    else if (mode === "autoRatePerDay") patch(idx, { ...clear, calc: "fixed", autoFromLocation: "ratePerDay" });
+    else if (mode === "autoDuty") patch(idx, { ...clear, calc: "fixed", autoFromAttendance: "duty" });
+    else if (mode === "autoExtraDuty") patch(idx, { ...clear, calc: "fixed", autoFromAttendance: "extraDuty" });
+    else patch(idx, { ...clear, calc: mode });
+  };
 
   const addComponent = () =>
     setComponents((prev) => [
@@ -324,9 +354,9 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
                     </select>
                   </td>
                   <td className="px-3 py-2">
-                    <select value={c.calc} onChange={(e) => patch(idx, { calc: e.target.value as CalcType })}
+                    <select value={modeOf(c)} onChange={(e) => setMode(idx, e.target.value as CalcMode)}
                       className="px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500">
-                      {CALCS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {CALC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </td>
                   <td className="px-3 py-2">
