@@ -16,7 +16,6 @@ interface Employee {
   joiningDate: string;
   mobileNumber: string;
   email: string;
-  aadharNumber: string;
   panNumber: string;
   status: string;
   workLocation: string;
@@ -24,7 +23,7 @@ interface Employee {
 
 export default function SearchEmployeePage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchBy, setSearchBy] = useState<'name' | 'aadharNumber'>('name');
+  const [searchBy, setSearchBy] = useState<'name' | 'employeeId'>('name');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -236,12 +235,12 @@ export default function SearchEmployeePage() {
               <input
                 type="radio"
                 name="searchBy"
-                value="id"
-                checked={searchBy === 'aadharNumber'}
-                onChange={(e) => setSearchBy('aadharNumber')}
+                value="employeeId"
+                checked={searchBy === 'employeeId'}
+                onChange={(e) => setSearchBy('employeeId')}
                 className="w-4 h-4 text-amber-600 focus:ring-amber-500"
               />
-              <span className="text-gray-700 font-medium">Search by Aadhar No.</span>
+              <span className="text-gray-700 font-medium">Search by Employee ID</span>
             </label>
           </div>
 
@@ -421,7 +420,7 @@ export default function SearchEmployeePage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Aadhar No.</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Emp. ID</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Designation</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Department</th>
@@ -441,9 +440,9 @@ export default function SearchEmployeePage() {
                 </tr>
               ) : (
                 filteredEmployees.map((employee) => (
-                  <tr key={employee.aadharNumber} className="hover:bg-gray-50">
+                  <tr key={employee.employeeId} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                      {employee.aadharNumber}
+                      {employee.employeeId}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">{employee.fullName}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{employee.designation}</td>
@@ -461,10 +460,12 @@ export default function SearchEmployeePage() {
                         <button onClick={() => handleViewDetails(employee)} className="p-2 hover:bg-gray-100 rounded-lg" title="View Details" > 
                           <Eye className="w-4 h-4 text-gray-600" /> 
                         </button> 
-                        <button onClick={() => openIdCard(employee)} className="bg-amber-600 text-slate-100 px-2 py-1 text-sm rounded-lg hover:bg-amber-700 whitespace-nowrap" > 
-                          View ID Card 
-                        </button> 
-                        {/* <button className="p-2 hover:bg-gray-100 rounded-lg" title="Edit" > <Edit className="w-4 h-4 text-gray-600" /> </button> */} 
+                        <button onClick={() => openIdCard(employee)} className="bg-amber-600 text-slate-100 px-2 py-1 text-sm rounded-lg hover:bg-amber-700 whitespace-nowrap" >
+                          View ID Card
+                        </button>
+                        <a href={`/admin/edit-employee/${employee.employeeId}`} className="p-2 hover:bg-gray-100 rounded-lg" title="Edit">
+                          <Edit className="w-4 h-4 text-gray-600" />
+                        </a>
                         {/* <button className="p-2 hover:bg-gray-100 rounded-lg" title="Delete" > <Trash2 className="w-4 h-4 text-red-600" /> </button>  */}
                       </div> 
                     </td>
@@ -598,7 +599,7 @@ function EmployeeDetailsModal({
           {/* Address Details */}
           <Section title="Address Details">
             <DetailRow label="Current Address" value={employee.currentAddress} />
-            <DetailRow label="Permanent Address as per Aadhar" value={employee.permanentAddress} />
+            <DetailRow label="Permanent Address" value={employee.permanentAddress} />
             <DetailRow label="City" value={employee.city} />
             <DetailRow label="State" value={employee.state} />
             <DetailRow label="Pincode" value={employee.pincode} />
@@ -751,7 +752,6 @@ function DownloadEmppdf({
       addRow('Designation', employee.designation);
       addRow('Department', employee.department);
       addRow('Joining Date', employee.joiningDate);
-      addRow('Aadhar No.', employee.aadharNumber);
       addRow('PAN', employee.panNumber);
       addRow('PF Number', employee.pfNumber);
       addRow('UAN', employee.uanNumber);

@@ -1,42 +1,78 @@
+// middleware.ts
+// Edge middleware: authentication + RBAC route gating using the edge-safe Auth.js config.
+// JWT session strategy means the session is decoded from the cookie here with no DB access.
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import verifyUser from "@/app/lib/authorize";
-export async function middleware(req: NextRequest) {
-  try {
-    
-    const { pathname } = req.nextUrl;
-     if (pathname.startsWith("/api/jobs") && req.method === "GET") {
-     return NextResponse.next();
-    }
-  // Verify user req
-    const user= await verifyUser(req) as {userID:string ,role:string}
-     console.log(pathname ,user,req.url)
+import { authConfig } from "@/auth.config";
+import { STAFF_ROLES, type Role } from "@/app/lib/rbac";
 
-    if (pathname.startsWith("/admin/login")) {
-        if(user.role==='superadmin')
-        return NextResponse.redirect(new URL("/admin", req.url));
-          if(user.role==='subadmin')
-        return NextResponse.redirect(new URL("/admin/add-employee", req.url));
-        else
-       return NextResponse.next()
-    }
+const { auth } = NextAuth(authConfig);
 
-    if(user.role==='superadmin')
+const CHANGE_PW_PATH = "/admin/change-password";
+const CHANGE_PW_API = "/api/account/change-password";
+
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
+  const session = req.auth;
+  const role = session?.user?.role as Role | undefined;
+  const mustReset = !!session?.user?.mustResetPassword;
+
+  const isApi = pathname.startsWith("/api");
+  const isLogin = pathname.startsWith("/admin/login");
+
+  // Public: job listings for the careers site (GET only).
+  if (pathname.startsWith("/api/jobs") && req.method === "GET") {
     return NextResponse.next();
+  }
 
-    if (user.role==='subadmin' &&( pathname.startsWith("/admin/add-employee") || pathname.startsWith("/api/employees"))) {
-      return NextResponse.next();
-    } else if(user.role==='subadmin')
-      return NextResponse.json({error:"You are not an admin"}, { status: 403 })
-
-  } catch(e) {
-    console.log("FAiled at middleware", e)
-    if(!req.nextUrl.pathname.startsWith("/admin/login"))
+  // --- Not authenticated ---
+  if (!session?.user) {
+    if (isLogin) return NextResponse.next();
+    if (isApi) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.redirect(new URL("/admin/login", req.url));
   }
-}
 
-// ✅ Only run on API routes
+  // --- Force password reset for temp passwords, before anything else ---
+  if (mustReset && !pathname.startsWith(CHANGE_PW_PATH) && pathname !== CHANGE_PW_API) {
+    if (isApi) {
+      return NextResponse.json({ error: "Password reset required" }, { status: 403 });
+    }
+    return NextResponse.redirect(new URL(CHANGE_PW_PATH, req.url));
+  }
+
+  // --- Authenticated visiting the login page -> send to role landing ---
+  if (isLogin) {
+    const dest = role && STAFF_ROLES.includes(role) ? "/admin" : "/portal";
+    return NextResponse.redirect(new URL(dest, req.url));
+  }
+
+  // --- Employees cannot access the /admin back-office (change-password excepted) ---
+  if (
+    pathname.startsWith("/admin") &&
+    !pathname.startsWith(CHANGE_PW_PATH) &&
+    !(role && STAFF_ROLES.includes(role))
+  ) {
+    return NextResponse.redirect(new URL("/portal", req.url));
+  }
+
+  // --- User management is admin-only (HR/managers are staff but not admins) ---
+  if (
+    (pathname.startsWith("/admin/users") || pathname.startsWith("/api/users")) &&
+    role !== "admin"
+  ) {
+    if (isApi) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.redirect(new URL("/admin", req.url));
+  }
+
+  return NextResponse.next();
+});
+
+// Run on the back-office, the self-service portal, and protected APIs.
+// Excludes Auth.js (/api/auth), and the existing public endpoints.
 export const config = {
-  matcher: ['/admin',"/api/:path((?!login|contact|upload|apply-jobs).*)",'/admin/:path*',],
+  matcher: [
+    "/admin/:path*",
+    "/portal/:path*",
+    "/api/:path((?!auth|contact|upload|apply-jobs).*)",
+  ],
 };

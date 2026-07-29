@@ -1,0 +1,130 @@
+// app/api/attendance/route.ts
+// Admin/HR attendance reports.
+//   GET ?date=YYYY-MM-DD                 -> all employees' status for that day
+//   GET ?month=YYYY-MM&employeeId=ss-1   -> one employee's monthly records + summary
+import { NextResponse } from "next/server";
+import { getCollection } from "@/app/lib/db";
+import { requirePermission } from "@/app/lib/apiAuth";
+import { istDateString, istMonthString } from "@/app/lib/attendance";
+import { getWorkingDays } from "@/app/lib/settingsServer";
+
+export async function GET(request: Request) {
+  const perm = await requirePermission("attendance:read:all");
+  if (!perm.ok) return NextResponse.json({ success: false, error: perm.error }, { status: perm.status });
+
+  const params = new URL(request.url).searchParams;
+  const employeeId = params.get("employeeId");
+  const month = params.get("month");
+
+  const attendance = await getCollection("attendance");
+
+  // --- Monthly view for a single employee ---
+  if (month && employeeId) {
+    const records = await attendance
+      .find({ employeeId, date: { $regex: `^${month}` } })
+      .sort({ date: 1 })
+      .toArray();
+
+    const present = records.filter((r) => r.status === "Present").length;
+    const halfDay = records.filter((r) => r.status === "Half Day").length;
+    const wd = await getWorkingDays();
+    const workingDays = countWorkingDaysSoFar(month, wd);
+    const absent = Math.max(0, workingDays - present - halfDay);
+
+    return NextResponse.json({
+      success: true,
+      mode: "month",
+      month,
+      employeeId,
+      records,
+      summary: { present, halfDay, absent, workingDays },
+      note: "Absent = working days so far (excl. Sundays) minus present/half-day. Holidays are applied in the holiday-calendar module.",
+    });
+  }
+
+  // --- Daily view across all employees (paginated + searchable) ---
+  const date = params.get("date") || istDateString();
+  const search = (params.get("search") || "").trim();
+  const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(params.get("limit") || "50", 10) || 50));
+  const skip = (page - 1) * limit;
+
+  const employees = await getCollection("employees");
+  const empQuery: any = {};
+  if (search) empQuery.fullName = { $regex: search, $options: "i" };
+
+  const total = await employees.countDocuments(empQuery);
+  const empList = await employees
+    .find(empQuery, { projection: { _id: 0, employeeId: 1, fullName: 1, designation: 1, workLocation: 1, status: 1 } })
+    .sort({ fullName: 1 })
+    .skip(skip)
+    .limit(limit)
+    .toArray();
+
+  // Only fetch the day's records for the employees on this page.
+  const pageIds = empList.map((e) => e.employeeId).filter(Boolean);
+  const dayRecords = await attendance.find({ date, employeeId: { $in: pageIds } }).toArray();
+  const byEmp = new Map(dayRecords.map((r) => [r.employeeId, r]));
+
+  const rows = empList
+    .filter((e) => e.employeeId)
+    .map((e) => {
+      const rec = byEmp.get(e.employeeId);
+      return {
+        employeeId: e.employeeId,
+        fullName: e.fullName,
+        designation: e.designation || "",
+        workLocation: e.workLocation || "",
+        status: rec?.status || "Absent",
+        clockIn: rec?.clockIn || null,
+        clockOut: rec?.clockOut || null,
+        workedMinutes: rec?.workedMinutes || 0,
+      };
+    });
+
+  // Summary reflects the whole organization for the day (not just this page):
+  // present/half-day come from stored records; absent = everyone else.
+  const totalEmployees = await employees.countDocuments({});
+  const present = await attendance.countDocuments({ date, status: "Present" });
+  const halfDay = await attendance.countDocuments({ date, status: "Half Day" });
+  const summary = {
+    present,
+    halfDay,
+    absent: Math.max(0, totalEmployees - present - halfDay),
+    total: totalEmployees,
+  };
+
+  return NextResponse.json({
+    success: true,
+    mode: "day",
+    date,
+    rows,
+    summary,
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  });
+}
+
+// Count working days (configured weekdays) from the 1st of `month` up to today
+// (or month end if the month is in the past).
+function countWorkingDaysSoFar(month: string, workingDays: number[] = [1, 2, 3, 4, 5, 6]): number {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return 0;
+  if (month > istMonthString()) return 0; // future month => nothing yet
+
+  const today = istDateString();
+  const lastDay =
+    month === istMonthString()
+      ? Number(today.slice(8, 10))
+      : new Date(Date.UTC(y, m, 0)).getUTCDate(); // day 0 of next month = last day of this month
+
+  const workingSet = new Set(workingDays);
+  let count = 0;
+  for (let d = 1; d <= lastDay; d++) {
+    const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+    if (workingSet.has(dow)) count++;
+  }
+  return count;
+}

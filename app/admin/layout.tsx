@@ -1,17 +1,27 @@
 // app/admin/layout.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  Briefcase, 
-  Users, 
-  Search, 
-  LogOut, 
-  Menu, 
+import { signOut } from 'next-auth/react';
+import {
+  Briefcase,
+  Users,
+  Search,
+  LogOut,
+  Menu,
   X,
-  Home
+  Home,
+  Building2,
+  Network,
+  CalendarCheck,
+  CalendarClock,
+  FileText,
+  Settings,
+  ExternalLink,
+  UserCog,
+  Wallet
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -20,18 +30,21 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleLogout =async () => {
-    // Implement logout logic
+  // Role drives visibility of admin-only nav items (e.g. User Management).
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then((r) => r.json())
+      .then((s) => setRole(s?.user?.role ?? null))
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = async () => {
     if (confirm('Are you sure you want to logout?')) {
-        await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logOut:true }),
-      });
-     location.reload()
+      await signOut({ callbackUrl: '/admin/login' });
     }
   };
 
@@ -42,9 +55,23 @@ const navItems = [
   { name: 'Add Job', icon: Briefcase, path: '/admin/add-job' },
   { name: 'Add Employee', icon: Users, path: '/admin/add-employee' },
   { name: 'Search Employee', icon: Search, path: '/admin/search-employee' },
+  { name: 'Organization', icon: Building2, path: '/admin/organization' },
+  { name: 'Reporting', icon: Network, path: '/admin/reporting' },
+  { name: 'Attendance', icon: CalendarCheck, path: '/admin/attendance' },
+  { name: 'Leave', icon: CalendarClock, path: '/admin/leave' },
+  { name: 'Payroll', icon: Wallet, path: '/admin/payroll', roles: ['admin', 'hr'] },
+  { name: 'Documents', icon: FileText, path: '/admin/documents' },
+  { name: 'Settings', icon: Settings, path: '/admin/settings' },
+  { name: 'User Management', icon: UserCog, path: '/admin/users', adminOnly: true },
   { name: 'Support Ticket', icon: Search, path: '/admin/support-messages' },
-  
-];
+  { name: 'Employee Portal', icon: ExternalLink, path: '/portal' },
+
+].filter((item) => (!item.adminOnly || role === 'admin') && (!item.roles || (role != null && item.roles.includes(role))));
+
+  // The login page is standalone — it must not render the admin sidebar/nav chrome.
+  if (pathname === '/admin/login') {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -77,7 +104,7 @@ const navItems = [
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-gray-200 z-40 transform lg:transform-none ${
+        className={`fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-gray-200 z-40 overflow-y-auto transform lg:transform-none ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -89,7 +116,7 @@ const navItems = [
                 key={item.path}
                 href={item.path}
                 onClick={() => setIsSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium ${
+                className={`flex items-center gap-3 px-4 py-0.5 rounded-lg font-medium ${
                   isActive
                     ? 'bg-amber-600 text-white'
                     : 'text-gray-700 hover:bg-gray-100'

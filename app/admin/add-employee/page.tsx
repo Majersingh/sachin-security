@@ -1,10 +1,20 @@
 // app/admin/add-employee/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import ProfilePhotoUpload from '@/app/components/uploadPP';
+import { getMissingRequired, isFieldRequired } from '@/app/lib/employeeFields';
+
+// Registry-driven required lookup so the form's asterisks and native `required`
+// attributes always match the central field registry.
+const isRequired = isFieldRequired;
+
+// Renders the mandatory asterisk only when the registry marks the field required.
+function Req({ field }: { field: string }) {
+  return isRequired(field) ? <span className="text-red-500">*</span> : null;
+}
 
 export default function AddEmployeePage() {
   const router = useRouter();
@@ -69,40 +79,39 @@ export default function AddEmployeePage() {
     emergencyContactRelation: ''
   });
 
+  // Organization dropdown options (from Phase 2 org entities)
+  const [orgOptions, setOrgOptions] = useState<{
+    departments: string[];
+    designations: string[];
+    locations: string[];
+  }>({ departments: [], designations: [], locations: [] });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [dep, des, loc] = await Promise.all([
+          fetch('/api/org/departments?activeOnly=1').then((r) => r.json()),
+          fetch('/api/org/designations?activeOnly=1').then((r) => r.json()),
+          fetch('/api/org/locations?activeOnly=1').then((r) => r.json()),
+        ]);
+        setOrgOptions({
+          departments: dep.success ? dep.data.map((d: any) => d.name).filter(Boolean) : [],
+          designations: des.success ? des.data.map((d: any) => d.title).filter(Boolean) : [],
+          locations: loc.success ? loc.data.map((l: any) => l.name).filter(Boolean) : [],
+        });
+      } catch (e) {
+        console.error('Failed to load organization options:', e);
+      }
+    })();
+  }, []);
+
   // Validate form
   const validateForm = () => {
-    // Required fields
-    const requiredFields = [
-      { field: 'fullName', label: 'Full Name' },
-      { field: 'fatherName', label: "Father's Name" },
-      { field: 'motherName', label: "Mother's Name" },
-      { field: 'profileUrl', label: "profile Url" },
-      { field: 'profileFilename', label: "Profile Name" },
-      { field: 'dateOfBirth', label: 'Date of Birth' },
-      { field: 'gender', label: 'Gender' },
-      { field: 'mobileNumber', label: 'Mobile Number' },
-      { field: 'permanentAddress', label: 'Permanent Address' },
-      { field: 'city', label: 'City' },
-      { field: 'state', label: 'State' },
-      { field: 'pincode', label: 'PIN Code' },
-      { field: 'aadharNumber', label: 'Aadhar Number' },
-    //   { field: 'panNumber', label: 'PAN Number' },
-      { field: 'uanNumber', label: 'UAN Number' },
-    //   { field: 'employeeId', label: 'Employee ID' },
-      { field: 'workLocation', label: 'Working Loacation' },
-    //   { field: 'designation', label: 'Designation' },
-    //   { field: 'department', label: 'Department' },
-      { field: 'joiningDate', label: 'Joining Date' },
-      { field: 'bankName', label: 'Nank Name' },
-      { field: 'accountNumber', label: 'A/C Number' },
-      { field: 'ifscCode', label: 'IFSC code' }
-    ];
-
-    for (const { field, label } of requiredFields) {
-      if (!formData[field as keyof typeof formData]?.trim()) {
-        setError(`${label} is required`);
-        return false;
-      }
+    // Required fields (driven by the central field registry).
+    const missing = getMissingRequired(formData);
+    if (missing.length > 0) {
+      setError(`${missing[0].label} is required`);
+      return false;
     }
 
     // Validate Aadhar (12 digits)
@@ -228,11 +237,11 @@ export default function AddEmployeePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name <span className="text-red-500">*</span>
+                Full Name <Req field="fullName" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('fullName')}
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -241,11 +250,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Father's Name <span className="text-red-500">*</span>
+                Father's Name <Req field="fatherName" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('fatherName')}
                 value={formData.fatherName}
                 onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -254,11 +263,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mother's Name <span className="text-red-500">*</span>
+                Mother's Name <Req field="motherName" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('motherName')}
                 value={formData.motherName}
                 onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -267,11 +276,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date of Birth <span className="text-red-500">*</span>
+                Date of Birth <Req field="dateOfBirth" />
               </label>
               <input
                 type="date"
-                required
+                required={isRequired('dateOfBirth')}
                 value={formData.dateOfBirth}
                 onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -280,10 +289,10 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Gender <span className="text-red-500">*</span>
+                Gender <Req field="gender" />
               </label>
               <select
-                required
+                required={isRequired('gender')}
                 value={formData.gender}
                 onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -297,9 +306,10 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Blood Group
+                Blood Group <Req field="bloodGroup" />
               </label>
               <select
+                required={isRequired('bloodGroup')}
                 value={formData.bloodGroup}
                 onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -318,9 +328,10 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Marital Status
+                Marital Status <Req field="maritalStatus" />
               </label>
               <select
+                required={isRequired('maritalStatus')}
                 value={formData.maritalStatus}
                 onChange={(e) => setFormData({ ...formData, maritalStatus: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -339,11 +350,11 @@ export default function AddEmployeePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mobile Number <span className="text-red-500">*</span>
+                Mobile Number <Req field="mobileNumber" />
               </label>
               <input
                 type="tel"
-                required
+                required={isRequired('mobileNumber')}
                 value={formData.mobileNumber}
                 onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -353,10 +364,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Alternate Number
+                Alternate Number <Req field="alternateNumber" />
               </label>
               <input
                 type="tel"
+                required={isRequired('alternateNumber')}
                 value={formData.alternateNumber}
                 onChange={(e) => setFormData({ ...formData, alternateNumber: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -365,10 +377,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
+                Email <Req field="email" />
               </label>
               <input
                 type="email"
+                required={isRequired('email')}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -377,10 +390,10 @@ export default function AddEmployeePage() {
 
             <div className="md:col-span-2 lg:col-span-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Permanent Address as Per Aadhar <span className="text-red-500">*</span>
+                Permanent Address as Per Aadhar <Req field="permanentAddress" />
               </label>
               <textarea
-                required
+                required={isRequired('permanentAddress')}
                 rows={2}
                 value={formData.permanentAddress}
                 onChange={(e) => setFormData({ ...formData, permanentAddress: e.target.value })}
@@ -390,9 +403,10 @@ export default function AddEmployeePage() {
 
             <div className="md:col-span-2 lg:col-span-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Current Address 
+                Current Address <Req field="currentAddress" />
               </label>
               <textarea
+                required={isRequired('currentAddress')}
                 rows={2}
                 value={formData.currentAddress}
                 onChange={(e) => setFormData({ ...formData, currentAddress: e.target.value })}
@@ -403,11 +417,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                City <span className="text-red-500">*</span>
+                City <Req field="city" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('city')}
                 value={formData.city}
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -416,11 +430,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                State <span className="text-red-500">*</span>
+                State <Req field="state" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('state')}
                 value={formData.state}
                 onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -429,11 +443,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                PIN Code <span className="text-red-500">*</span>
+                PIN Code <Req field="pincode" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('pincode')}
                 maxLength={6}
                 value={formData.pincode}
                 onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
@@ -450,11 +464,11 @@ export default function AddEmployeePage() {
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Aadhar Number <span className="text-red-500">*</span>
+                Aadhar Number <Req field="aadharNumber" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('aadharNumber')}
                 maxLength={12}
                 value={formData.aadharNumber}
                 onChange={(e) => setFormData({ ...formData, aadharNumber: e.target.value })}
@@ -465,10 +479,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                PAN Number
+                PAN Number <Req field="panNumber" />
               </label>
               <input
                 type="text"
+                required={isRequired('panNumber')}
                 maxLength={10}
                 value={formData.panNumber}
                 onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
@@ -497,35 +512,45 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Designation 
+                Designation <Req field="designation" />
               </label>
-              <input
-                type="text"
+              <select
+                required={isRequired('designation')}
                 value={formData.designation}
                 onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
+              >
+                <option value="">Select Designation</option>
+                {orgOptions.designations.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Department
+                Department <Req field="department" />
               </label>
-              <input
-                type="text"
+              <select
+                required={isRequired('department')}
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
+              >
+                <option value="">Select Department</option>
+                {orgOptions.departments.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Joining Date <span className="text-red-500">*</span>
+                Joining Date <Req field="joiningDate" />
               </label>
               <input
                 type="date"
-                required
+                required={isRequired('joiningDate')}
                 value={formData.joiningDate}
                 onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -534,9 +559,10 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Employment Type
+                Employment Type <Req field="employmentType" />
               </label>
               <select
+                required={isRequired('employmentType')}
                 value={formData.employmentType}
                 onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -549,15 +575,19 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Work Location <span className="text-red-500">*</span>
+                Work Location <Req field="workLocation" />
               </label>
-              <input
-                type="text"
-                required
+              <select
+                required={isRequired('workLocation')}
                 value={formData.workLocation}
                 onChange={(e) => setFormData({ ...formData, workLocation: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
+              >
+                <option value="">Select Work Location</option>
+                {orgOptions.locations.map((l) => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -568,10 +598,11 @@ export default function AddEmployeePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Basic Salary
+                Basic Salary <Req field="basicSalary" />
               </label>
               <input
                 type="number"
+                required={isRequired('basicSalary')}
                 value={formData.basicSalary}
                 onChange={(e) => setFormData({ ...formData, basicSalary: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -580,10 +611,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                HRA
+                HRA <Req field="hra" />
               </label>
               <input
                 type="number"
+                required={isRequired('hra')}
                 value={formData.hra}
                 onChange={(e) => setFormData({ ...formData, hra: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -592,10 +624,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Other Allowances
+                Other Allowances <Req field="otherAllowances" />
               </label>
               <input
                 type="number"
+                required={isRequired('otherAllowances')}
                 value={formData.otherAllowances}
                 onChange={(e) => setFormData({ ...formData, otherAllowances: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -604,10 +637,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                PF Number
+                PF Number <Req field="pfNumber" />
               </label>
               <input
                 type="text"
+                required={isRequired('pfNumber')}
                 value={formData.pfNumber}
                 onChange={(e) => setFormData({ ...formData, pfNumber: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -616,10 +650,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                ESI Number
+                ESI Number <Req field="esiNumber" />
               </label>
               <input
                 type="text"
+                required={isRequired('esiNumber')}
                 value={formData.esiNumber}
                 onChange={(e) => setFormData({ ...formData, esiNumber: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -628,11 +663,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                UAN Number <span className="text-red-500">*</span>
+                UAN Number <Req field="uanNumber" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('uanNumber')}
                 value={formData.uanNumber}
                 onChange={(e) => setFormData({ ...formData, uanNumber: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -647,11 +682,11 @@ export default function AddEmployeePage() {
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bank Name <span className="text-red-500">*</span>
+                Bank Name <Req field="bankName" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('bankName')}
                 value={formData.bankName}
                 onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -660,11 +695,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Account Number <span className="text-red-500">*</span>
+                Account Number <Req field="accountNumber" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('accountNumber')}
                 value={formData.accountNumber}
                 onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -673,11 +708,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                IFSC Code <span className="text-red-500">*</span>
+                IFSC Code <Req field="ifscCode" />
               </label>
               <input
                 type="text"
-                required
+                required={isRequired('ifscCode')}
                 value={formData.ifscCode}
                 onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -686,10 +721,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Branch Name
+                Branch Name <Req field="branchName" />
               </label>
               <input
                 type="text"
+                required={isRequired('branchName')}
                 value={formData.branchName}
                 onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -704,10 +740,11 @@ export default function AddEmployeePage() {
           <div className="grid md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contact Name
+                Contact Name <Req field="emergencyContactName" />
               </label>
               <input
                 type="text"
+                required={isRequired('emergencyContactName')}
                 value={formData.emergencyContactName}
                 onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -716,10 +753,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contact Number
+                Contact Number <Req field="emergencyContactNumber" />
               </label>
               <input
                 type="tel"
+                required={isRequired('emergencyContactNumber')}
                 value={formData.emergencyContactNumber}
                 onChange={(e) => setFormData({ ...formData, emergencyContactNumber: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -728,10 +766,11 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Relation
+                Relation <Req field="emergencyContactRelation" />
               </label>
               <input
                 type="text"
+                required={isRequired('emergencyContactRelation')}
                 value={formData.emergencyContactRelation}
                 onChange={(e) => setFormData({ ...formData, emergencyContactRelation: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"

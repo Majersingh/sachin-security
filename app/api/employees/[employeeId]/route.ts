@@ -1,6 +1,7 @@
 // app/api/employees/[employeeId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/app/lib/db';
+import { requirePermission } from '@/app/lib/apiAuth';
 
 // GET - Fetch single employee
 export async function GET(
@@ -8,6 +9,9 @@ export async function GET(
   context: { params: Promise<{ employeeId: string }> }
 ) {
   try {
+    const perm = await requirePermission('employees:read');
+    if (!perm.ok) return NextResponse.json({ success: false, error: perm.error }, { status: perm.status });
+
     const params = await context.params;
     const collection = await getCollection('employees');
     const employee = await collection.findOne({ employeeId: params.employeeId });
@@ -37,12 +41,17 @@ export async function PUT(
   context: { params: Promise<{ employeeId: string }> }
 ) {
   try {
+    const perm = await requirePermission('employees:write');
+    if (!perm.ok) return NextResponse.json({ success: false, error: perm.error }, { status: perm.status });
+
     const params = await context.params;
     const body = await request.json();
     const collection = await getCollection('employees');
-    
+
+    // employeeId is the key and is not editable; drop it and internal fields.
+    const { employeeId: _ignore, _id, createdAt, ...rest } = body;
     const updateData = {
-      ...body,
+      ...rest,
       updatedAt: new Date()
     };
     
@@ -76,9 +85,12 @@ export async function DELETE(
   context: { params: Promise<{ employeeId: string }> }
 ) {
   try {
+    const perm = await requirePermission('employees:write');
+    if (!perm.ok) return NextResponse.json({ success: false, error: perm.error }, { status: perm.status });
+
     const params = await context.params;
     const collection = await getCollection('employees');
-    
+
     const result = await collection.deleteOne({ employeeId: params.employeeId });
     
     if (result.deletedCount === 0) {
