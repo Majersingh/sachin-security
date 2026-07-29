@@ -5,6 +5,11 @@ import { encryptId } from '@/app/lib/idcrypto';
 import { createEmployeeUser } from '@/app/lib/users';
 import { getMissingRequired, buildEmployeeFieldValues } from '@/app/lib/employeeFields';
 
+// Escape user input so it is treated as a literal string inside a regex.
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // GET - Fetch all employees
 export async function GET(request: NextRequest) {
   try {
@@ -82,7 +87,9 @@ export async function GET(request: NextRequest) {
       if (searchBy === 'name') {
         query.fullName = { $regex: search, $options: 'i' };
       } else if (searchBy === 'employeeId') {
-        query.employeeId = { $regex: search, $options: 'i' };
+        // Exact match (anchored + escaped), case-insensitive — so "ss-1" returns
+        // only ss-1, never ss-10 / ss-11 / ss-100.
+        query.employeeId = { $regex: `^${escapeRegex(search.trim())}$`, $options: 'i' };
       }
     }
 
