@@ -57,3 +57,58 @@ export async function createEmployeeUser(opts: {
 
   return { created: true, tempPassword };
 }
+
+// Create a login account from admin-entered data (the "Add user" modal). Like
+// createEmployeeUser but employeeId is optional and the role is chosen by the
+// admin. Idempotent: refuses if a user already exists for the given email or
+// employeeId. Returns the temp password (shown once) and the safe user doc.
+export async function createUserAccount(opts: {
+  name?: string;
+  email?: string;
+  employeeId?: string;
+  role?: Role;
+}): Promise<{ created: boolean; tempPassword: string | null; user?: any; reason?: "exists" | "missing-id" }> {
+  const users = await getUsersCollection();
+  const email = opts.email?.trim().toLowerCase() || undefined;
+  const employeeId = opts.employeeId?.trim() || undefined;
+
+  // A login needs at least one identifier to sign in with.
+  if (!email && !employeeId) return { created: false, tempPassword: null, reason: "missing-id" };
+
+  const orClauses: any[] = [];
+  if (employeeId) orClauses.push({ employeeId });
+  if (email) orClauses.push({ email });
+  const existing = await users.findOne({ $or: orClauses });
+  if (existing) return { created: false, tempPassword: null, reason: "exists" };
+
+  const tempPassword = generateTempPassword();
+  const passwordHash = await hashPassword(tempPassword);
+  const doc = {
+    employeeId,
+    email,
+    name: opts.name?.trim() || email || employeeId,
+    role: opts.role || "employee",
+    passwordHash,
+    active: true,
+    mustResetPassword: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const res = await users.insertOne(doc as any);
+  // Return the account without the password hash.
+  return {
+    created: true,
+    tempPassword,
+    user: {
+      _id: String(res.insertedId),
+      employeeId: doc.employeeId,
+      email: doc.email,
+      name: doc.name,
+      role: doc.role,
+      active: doc.active,
+      mustResetPassword: doc.mustResetPassword,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    },
+  };
+}
