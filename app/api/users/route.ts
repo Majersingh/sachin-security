@@ -1,114 +1,86 @@
-// app/lib/users.ts
-// Helpers for the `users` collection (login accounts). Node runtime only (uses bcrypt).
-import crypto from "crypto";
-import bcrypt from "bcryptjs";
-import { getCollection } from "@/app/lib/db";
-import type { Role } from "@/app/lib/rbac";
+// app/api/users/route.ts
+// Admin-only: list login accounts (the `users` collection) with search + pagination,
+// and create a new login account.
+import { NextResponse } from "next/server";
+import { getUsersCollection, createUserAccount } from "@/app/lib/users";
+import { requireAdmin } from "@/app/lib/apiAuth";
+import { isRole } from "@/app/lib/rbac";
 
-const BCRYPT_ROUNDS = 10;
+export async function GET(request: Request) {
+  const perm = await requireAdmin();
+  if (!perm.ok) return NextResponse.json({ success: false, error: perm.error }, { status: perm.status });
 
-export async function getUsersCollection() {
-  return getCollection("users");
-}
+  const { searchParams } = new URL(request.url);
+  const search = (searchParams.get("search") || "").trim();
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25", 10) || 25));
+  const skip = (page - 1) * limit;
 
-// Human-friendly but reasonably strong temporary password (no ambiguous chars).
-export function generateTempPassword(len = 10): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#";
-  let out = "";
-  for (let i = 0; i < len; i++) out += chars[crypto.randomInt(chars.length)];
-  return out;
-}
+  const query: any = {};
+  if (search) {
+    const rx = { $regex: search, $options: "i" };
+    query.$or = [{ name: rx }, { email: rx }, { employeeId: rx }];
+  }
 
-export function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, BCRYPT_ROUNDS);
-}
-
-// Create a login account for a newly-added employee. Idempotent: if a user
-// already exists for this employeeId/email, it does nothing. Returns the
-// generated temp password (shown once to HR) when a new account is created.
-export async function createEmployeeUser(opts: {
-  employeeId: string;
-  email?: string;
-  name?: string;
-  role?: Role;
-}): Promise<{ created: boolean; tempPassword: string | null }> {
   const users = await getUsersCollection();
-  const email = opts.email?.trim().toLowerCase() || undefined;
+  const total = await users.countDocuments(query);
+  const list = await users
+    .find(query, { projection: { passwordHash: 0 } })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .toArray();
 
-  const orClauses: any[] = [{ employeeId: opts.employeeId }];
-  if (email) orClauses.push({ email });
-  const existing = await users.findOne({ $or: orClauses });
-  if (existing) return { created: false, tempPassword: null };
+  const data = list.map((u: any) => ({ ...u, _id: String(u._id) }));
 
-  const tempPassword = generateTempPassword();
-  const passwordHash = await hashPassword(tempPassword);
+  return NextResponse.json({
+    success: true,
+    data,
+    total,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  });
+}
 
-  await users.insertOne({
-    employeeId: opts.employeeId,
-    email,
-    name: opts.name || opts.employeeId,
-    role: opts.role || "employee",
-    passwordHash,
-    active: true,
-    mustResetPassword: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+// POST /api/users — create a login account. Body: { name?, email?, employeeId?, role? }.
+// Requires at least an email or employeeId; refuses if one already exists.
+export async function POST(request: Request) {
+  const perm = await requireAdmin();
+  if (!perm.ok) return NextResponse.json({ success: false, error: perm.error }, { status: perm.status });
+
+  const body = await request.json().catch(() => ({}));
+  const name = String(body?.name || "").trim();
+  const email = String(body?.email || "").trim();
+  const employeeId = String(body?.employeeId || "").trim();
+  const role = String(body?.role || "employee");
+
+  if (!email && !employeeId) {
+    return NextResponse.json({ success: false, error: "Provide an email or employee ID" }, { status: 400 });
+  }
+  if (!isRole(role)) {
+    return NextResponse.json({ success: false, error: "Invalid role" }, { status: 400 });
+  }
+
+  const result = await createUserAccount({
+    name,
+    email: email || undefined,
+    employeeId: employeeId || undefined,
+    role,
   });
 
-  return { created: true, tempPassword };
-}
+  if (!result.created) {
+    if (result.reason === "exists") {
+      return NextResponse.json(
+        { success: false, exists: true, error: "A user already exists for that email or employee ID" },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ success: false, error: "Could not create user" }, { status: 400 });
+  }
 
-// Create a login account from admin-entered data (the "Add user" modal). Like
-// createEmployeeUser but employeeId is optional and the role is chosen by the
-// admin. Idempotent: refuses if a user already exists for the given email or
-// employeeId. Returns the temp password (shown once) and the safe user doc.
-export async function createUserAccount(opts: {
-  name?: string;
-  email?: string;
-  employeeId?: string;
-  role?: Role;
-}): Promise<{ created: boolean; tempPassword: string | null; user?: any; reason?: "exists" | "missing-id" }> {
-  const users = await getUsersCollection();
-  const email = opts.email?.trim().toLowerCase() || undefined;
-  const employeeId = opts.employeeId?.trim() || undefined;
-
-  // A login needs at least one identifier to sign in with.
-  if (!email && !employeeId) return { created: false, tempPassword: null, reason: "missing-id" };
-
-  const orClauses: any[] = [];
-  if (employeeId) orClauses.push({ employeeId });
-  if (email) orClauses.push({ email });
-  const existing = await users.findOne({ $or: orClauses });
-  if (existing) return { created: false, tempPassword: null, reason: "exists" };
-
-  const tempPassword = generateTempPassword();
-  const passwordHash = await hashPassword(tempPassword);
-  const doc = {
-    employeeId,
-    email,
-    name: opts.name?.trim() || email || employeeId,
-    role: opts.role || "employee",
-    passwordHash,
-    active: true,
-    mustResetPassword: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  const res = await users.insertOne(doc as any);
-  // Return the account without the password hash.
-  return {
-    created: true,
-    tempPassword,
-    user: {
-      _id: String(res.insertedId),
-      employeeId: doc.employeeId,
-      email: doc.email,
-      name: doc.name,
-      role: doc.role,
-      active: doc.active,
-      mustResetPassword: doc.mustResetPassword,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
-    },
-  };
+  return NextResponse.json(
+    { success: true, user: result.user, loginId: email || employeeId, tempPassword: result.tempPassword },
+    { status: 201 }
+  );
 }
