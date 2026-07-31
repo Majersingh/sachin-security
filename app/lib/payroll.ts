@@ -30,7 +30,7 @@ export interface SalaryComponent {
   daysKey?: string; // for calc "perDay": day-count component
   percent?: number; // for calc "percentOf"
   baseKey?: string; // for calc "percentOf": component to take % of
-  autoFromAttendance?: "duty" | "extraDuty"; // pre-fill this info value from attendance
+  autoFromAttendance?: "duty" | "extraDuty" | "absent"; // pre-fill this info value from attendance
   autoFromLocation?: "rate" | "ratePerDay"; // resolve this value live from the location rate card
 }
 
@@ -63,6 +63,7 @@ export interface Payslip {
   month: string; // "YYYY-MM"
   dutyDays: number;
   extraDutyDays: number;
+  absentDays: number;
   lines: PayslipLine[];
   grossPay: number;
   totalDeduction: number;
@@ -245,7 +246,9 @@ export function sanitizeComponents(input: unknown): SalaryComponent[] {
       percent: r.percent != null ? num(r.percent) : undefined,
       baseKey: r.baseKey ? String(r.baseKey) : undefined,
       autoFromAttendance:
-        r.autoFromAttendance === "duty" || r.autoFromAttendance === "extraDuty"
+        r.autoFromAttendance === "duty" ||
+        r.autoFromAttendance === "extraDuty" ||
+        r.autoFromAttendance === "absent"
           ? r.autoFromAttendance
           : undefined,
       autoFromLocation,

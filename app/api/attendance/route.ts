@@ -7,6 +7,7 @@ import { getCollection } from "@/app/lib/db";
 import { requirePermission } from "@/app/lib/apiAuth";
 import { istDateString, istMonthString } from "@/app/lib/attendance";
 import { getWorkingDays } from "@/app/lib/settingsServer";
+import { getHolidaysInRange } from "@/app/lib/leaveServer";
 
 export async function GET(request: Request) {
   const perm = await requirePermission("attendance:read:all");
@@ -28,7 +29,8 @@ export async function GET(request: Request) {
     const present = records.filter((r) => r.status === "Present").length;
     const halfDay = records.filter((r) => r.status === "Half Day").length;
     const wd = await getWorkingDays();
-    const workingDays = countWorkingDaysSoFar(month, wd);
+    const holidays = new Set(await getHolidaysInRange(`${month}-01`, `${month}-31`));
+    const workingDays = countWorkingDaysSoFar(month, wd, holidays);
     const absent = Math.max(0, workingDays - present - halfDay);
 
     return NextResponse.json({
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
       employeeId,
       records,
       summary: { present, halfDay, absent, workingDays },
-      note: "Absent = working days so far (excl. Sundays) minus present/half-day. Holidays are applied in the holiday-calendar module.",
+      note: "Absent = working days so far (excl. week-offs and holidays) minus present/half-day.",
     });
   }
 
@@ -107,9 +109,13 @@ export async function GET(request: Request) {
   });
 }
 
-// Count working days (configured weekdays) from the 1st of `month` up to today
-// (or month end if the month is in the past).
-function countWorkingDaysSoFar(month: string, workingDays: number[] = [1, 2, 3, 4, 5, 6]): number {
+// Count working days (configured weekdays, excluding holidays) from the 1st of
+// `month` up to today (or month end if the month is in the past).
+function countWorkingDaysSoFar(
+  month: string,
+  workingDays: number[] = [1, 2, 3, 4, 5, 6],
+  holidays: Set<string> = new Set()
+): number {
   const [y, m] = month.split("-").map(Number);
   if (!y || !m) return 0;
   if (month > istMonthString()) return 0; // future month => nothing yet
@@ -124,7 +130,10 @@ function countWorkingDaysSoFar(month: string, workingDays: number[] = [1, 2, 3, 
   let count = 0;
   for (let d = 1; d <= lastDay; d++) {
     const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
-    if (workingSet.has(dow)) count++;
+    if (!workingSet.has(dow)) continue; // week-off
+    const dateStr = `${month}-${String(d).padStart(2, "0")}`;
+    if (holidays.has(dateStr)) continue; // declared holiday
+    count++;
   }
   return count;
 }

@@ -85,6 +85,9 @@ export async function POST(request: NextRequest) {
   for (const c of components) {
     if (c.autoFromAttendance === "duty") overrides[c.key] = dutyDays;
     if (c.autoFromAttendance === "extraDuty") overrides[c.key] = manualOverrides["extraDuty"] ?? 0;
+    // Absent days are admin-entered (0 if not provided); a component can reference
+    // this key to build a deduction, e.g. Absent × Rate/Day.
+    if (c.autoFromAttendance === "absent") overrides[c.key] = manualOverrides["absent"] ?? 0;
   }
   for (const [k, v] of Object.entries(manualOverrides)) {
     if (overridable.has(k)) overrides[k] = v; // ignore attempts to override derived lines
@@ -111,6 +114,7 @@ export async function POST(request: NextRequest) {
   }));
   const dutyKey = components.find((c) => c.autoFromAttendance === "duty")?.key;
   const extraDutyKey = components.find((c) => c.autoFromAttendance === "extraDuty")?.key;
+  const absentKey = components.find((c) => c.autoFromAttendance === "absent")?.key;
 
   const now = new Date();
   const doc = {
@@ -124,6 +128,7 @@ export async function POST(request: NextRequest) {
     month,
     dutyDays: dutyKey ? values[dutyKey] ?? dutyDays : dutyDays,
     extraDutyDays: extraDutyKey ? values[extraDutyKey] ?? 0 : 0,
+    absentDays: absentKey ? values[absentKey] ?? 0 : manualOverrides["absent"] ?? 0,
     lines,
     grossPay,
     totalDeduction,

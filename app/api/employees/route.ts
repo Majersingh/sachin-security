@@ -177,19 +177,30 @@ export async function POST(request: NextRequest) {
     const result = await collection.insertOne(employeeData);
 
     // Auto-create a login account for the new employee (role: employee) with a
-    // temporary password that must be reset on first login.
+    // temporary password that must be reset on first login. If it can't be
+    // created, the employee is still saved but we surface a warning so HR knows
+    // to create the account manually from User Management (rather than it failing
+    // silently).
     let tempPassword: string | null = null;
     let loginId: string | null = null;
+    let accountWarning: string | null = null;
     try {
       const account = await createEmployeeUser({
         employeeId: employeeData.employeeId,
         email: employeeData.email,
         name: employeeData.fullName,
       });
-      tempPassword = account.tempPassword;
-      loginId = employeeData.email || employeeData.employeeId;
+      if (account.created) {
+        tempPassword = account.tempPassword;
+        loginId = employeeData.email || employeeData.employeeId;
+      } else {
+        accountWarning =
+          'Employee saved, but no login account was created — one already exists for this email or employee ID.';
+      }
     } catch (e) {
       console.error('Failed to create employee login account:', e);
+      accountWarning =
+        'Employee saved, but the login account could not be created. Add it later from User Management.';
     }
 
     return NextResponse.json({
@@ -198,6 +209,7 @@ export async function POST(request: NextRequest) {
       data: { ...employeeData, _id: result.insertedId },
       // Shown once so HR can hand the credentials to the employee.
       account: tempPassword ? { loginId, tempPassword } : null,
+      accountWarning,
     }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json(

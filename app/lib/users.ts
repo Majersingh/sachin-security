@@ -45,7 +45,10 @@ export async function createEmployeeUser(opts: {
 
   await users.insertOne({
     employeeId: opts.employeeId,
-    email,
+    // Only set `email` when present. The unique+sparse index on `email` treats a
+    // stored `null` as a value, so inserting null for every no-email employee
+    // collides after the first — omitting the field lets the sparse index skip it.
+    ...(email ? { email } : {}),
     name: opts.name || opts.employeeId,
     role: opts.role || "employee",
     passwordHash,
@@ -83,9 +86,9 @@ export async function createUserAccount(opts: {
 
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
-  const doc = {
-    employeeId,
-    email,
+  // Only include identifiers that are present — a stored `null` on the unique+sparse
+  // email/employeeId indexes would collide across all null-valued accounts.
+  const doc: Record<string, any> = {
     name: opts.name?.trim() || email || employeeId,
     role: opts.role || "employee",
     passwordHash,
@@ -94,6 +97,8 @@ export async function createUserAccount(opts: {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+  if (employeeId) doc.employeeId = employeeId;
+  if (email) doc.email = email;
   const res = await users.insertOne(doc as any);
   // Return the account without the password hash.
   return {

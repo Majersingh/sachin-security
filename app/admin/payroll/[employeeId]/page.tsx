@@ -18,7 +18,7 @@ const CATEGORIES: { value: ComponentCategory; label: string }[] = [
 // The calculation dropdown offers the real CalcTypes plus four "auto" modes that
 // are really calc:"fixed" + an autoFromLocation/autoFromAttendance marker. modeOf()
 // and setMode() translate between this dropdown value and the stored component.
-type CalcMode = CalcType | "autoRate" | "autoRatePerDay" | "autoDuty" | "autoExtraDuty";
+type CalcMode = CalcType | "autoRate" | "autoRatePerDay" | "autoDuty" | "autoExtraDuty" | "autoAbsent";
 const CALC_OPTIONS: { value: CalcMode; label: string }[] = [
   { value: "fixed", label: "Fixed amount" },
   { value: "perDay", label: "Per day (rate × days)" },
@@ -30,6 +30,7 @@ const CALC_OPTIONS: { value: CalcMode; label: string }[] = [
   { value: "autoRatePerDay", label: "Auto: Rate/Day (from location)" },
   { value: "autoDuty", label: "Auto: Duty days (from attendance)" },
   { value: "autoExtraDuty", label: "Auto: Extra Duty days (from attendance)" },
+  { value: "autoAbsent", label: "Auto: Absent days (from attendance)" },
 ];
 
 const modeOf = (c: SalaryComponent): CalcMode =>
@@ -41,6 +42,8 @@ const modeOf = (c: SalaryComponent): CalcMode =>
     ? "autoDuty"
     : c.autoFromAttendance === "extraDuty"
     ? "autoExtraDuty"
+    : c.autoFromAttendance === "absent"
+    ? "autoAbsent"
     : c.calc;
 
 const catColor: Record<ComponentCategory, string> = {
@@ -70,6 +73,7 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
   const [history, setHistory] = useState<Payslip[]>([]);
   const [attSummary, setAttSummary] = useState<{ present: number; halfDay: number; absent: number; workingDays: number } | null>(null);
   const [extraDuty, setExtraDuty] = useState("");
+  const [absent, setAbsent] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [company, setCompany] = useState<any>(null);
   const [tab, setTab] = useState<"generate" | "config">("generate");
@@ -118,6 +122,12 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
 
   useEffect(() => { loadAttSummary(); }, [loadAttSummary]);
 
+  // Prefill the Absent field from attendance when the month/employee changes.
+  // Still editable, so the admin can override it for a specific payslip.
+  useEffect(() => {
+    if (attSummary) setAbsent(String(attSummary.absent ?? 0));
+  }, [attSummary]);
+
   const dutyDays = attSummary ? attSummary.present + attSummary.halfDay * 0.5 : 0;
 
   // Rate / Rate Per Day are resolved live from the location rate card, never stored.
@@ -149,6 +159,7 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
     else if (mode === "autoRatePerDay") patch(idx, { ...clear, calc: "fixed", autoFromLocation: "ratePerDay" });
     else if (mode === "autoDuty") patch(idx, { ...clear, calc: "fixed", autoFromAttendance: "duty" });
     else if (mode === "autoExtraDuty") patch(idx, { ...clear, calc: "fixed", autoFromAttendance: "extraDuty" });
+    else if (mode === "autoAbsent") patch(idx, { ...clear, calc: "fixed", autoFromAttendance: "absent" });
     else patch(idx, { ...clear, calc: mode });
   };
 
@@ -194,6 +205,9 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
     }
     if (extraDuty.trim() !== "" && Number.isFinite(parseFloat(extraDuty))) {
       overrides.extraDuty = parseFloat(extraDuty);
+    }
+    if (absent.trim() !== "" && Number.isFinite(parseFloat(absent))) {
+      overrides.absent = parseFloat(absent);
     }
     return overrides;
   };
@@ -437,6 +451,11 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
             <input type="number" min={0} value={extraDuty} onChange={(e) => setExtraDuty(e.target.value)} placeholder="0"
               className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
           </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Absent (days)</label>
+            <input type="number" min={0} value={absent} onChange={(e) => setAbsent(e.target.value)} placeholder={String(attSummary?.absent ?? 0)}
+              className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+          </div>
           <button onClick={runPreview} disabled={generating || isDefault}
             className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-60">
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />} Generate preview
@@ -451,6 +470,7 @@ export default function PayrollEditorPage({ params }: { params: Promise<{ employ
           <AttChip label="Absent" value={attSummary?.absent ?? 0} cls="bg-red-100 text-red-700" />
           <AttChip label="Duty (auto)" value={dutyDays} cls="bg-slate-800 text-white" />
           {extraDuty.trim() !== "" && <AttChip label="Extra Duty" value={parseFloat(extraDuty) || 0} cls="bg-blue-100 text-blue-800" />}
+          {absent.trim() !== "" && <AttChip label="Absent (used)" value={parseFloat(absent) || 0} cls="bg-red-100 text-red-700" />}
         </div>
 
         {/* Adjust variable fixed amounts for this month (advances, deductions, etc.) */}
@@ -633,6 +653,7 @@ function PayslipDocument({ payslip: p, company }: { payslip: Payslip; company: a
         {p.esiNumber && <InfoRow k="ESI No." v={p.esiNumber} />}
         <InfoRow k="Duty Days" v={String(p.dutyDays)} />
         <InfoRow k="Extra Duty" v={String(p.extraDutyDays)} />
+        {p.absentDays ? <InfoRow k="Absent Days" v={String(p.absentDays)} /> : null}
         <InfoRow k="Ref No." v={p.refId} />
         <InfoRow k="Generated" v={new Date(p.generatedAt).toLocaleDateString("en-IN")} />
       </div>

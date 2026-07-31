@@ -21,6 +21,7 @@ export default function AddEmployeePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [accountWarning, setAccountWarning] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     // Personal Information
@@ -174,11 +175,15 @@ export default function AddEmployeePage() {
 
       if (data.success) {
         setSuccess(true);
-        
-        // Show success message for 2 seconds then redirect
-        setTimeout(() => {
-          router.push('/admin/search-employee');
-        }, 2000);
+        setAccountWarning(data.accountWarning || null);
+
+        // If the login account was created cleanly, auto-redirect. If there's a
+        // warning, stay on the screen so HR reads it and continues manually.
+        if (!data.accountWarning) {
+          setTimeout(() => {
+            router.push('/admin/search-employee');
+          }, 2000);
+        }
       } else {
         setError(data.error || 'Failed to add employee. Please try again.');
       }
@@ -202,10 +207,25 @@ export default function AddEmployeePage() {
           <p className="text-gray-600 text-lg mb-2">
             <strong>{formData.fullName}</strong> ({formData.employeeId})
           </p>
-          <p className="text-gray-600 mb-6">
-            Redirecting to employee list...
-          </p>
-          <Loader2 className="w-6 h-6 text-amber-600 animate-spin mx-auto" />
+          {accountWarning ? (
+            <>
+              <div className="max-w-lg mx-auto flex items-start gap-2 text-left bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">{accountWarning}</p>
+              </div>
+              <button
+                onClick={() => router.push('/admin/search-employee')}
+                className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium"
+              >
+                Go to employee list
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-600 mb-6">Redirecting to employee list...</p>
+              <Loader2 className="w-6 h-6 text-amber-600 animate-spin mx-auto" />
+            </>
+          )}
         </div>
       </div>
     );
