@@ -68,11 +68,13 @@ export default auth((req) => {
 });
 
 // Run on the back-office, the self-service portal, and protected APIs.
-// Excludes Auth.js (/api/auth), and the existing public endpoints.
+// Excludes Auth.js (/api/auth), the public endpoints, and profile-photo downloads
+// (shown on the public /employees/[id] verification page, so they must load
+// without a session — resume downloads stay gated).
 export const config = {
   matcher: [
     "/admin/:path*",
     "/portal/:path*",
-    "/api/:path((?!auth|contact|upload|apply-jobs).*)",
+    "/api/:path((?!auth|contact|upload|apply-jobs|download/profile).*)",
   ],
 };
