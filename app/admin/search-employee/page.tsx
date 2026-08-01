@@ -870,8 +870,8 @@ function IdCardFaces({ employee, qrSrc, profileImg }: { employee: any; qrSrc: st
             className="w-6 h-6 rounded-full bg-white p-0.5 object-contain shrink-0"
           />
           <div className="flex-1 text-center pr-6">
-            <h1 className="text-[10px] font-bold uppercase tracking-wider leading-tight">Sachin Security Services</h1>
-            <p className="text-[6.5px] text-gray-300 tracking-wide uppercase mt-0.5">Identity Card</p>
+            <h1 className="text-[12px] font-bold uppercase tracking-wider leading-tight">Sachin Security Services</h1>
+            <p className="text-[7.5px] font-semibold text-gray-300 tracking-wide uppercase mt-0.5">Identity Card</p>
           </div>
         </div>
 
@@ -882,20 +882,20 @@ function IdCardFaces({ employee, qrSrc, profileImg }: { employee: any; qrSrc: st
             {profileImg ? (
               <img src={profileImg} alt="Emp Profile" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-400 bg-gray-50">No Image</div>
+              <div className="w-full h-full flex items-center justify-center text-[9px] text-gray-400 bg-gray-50">No Image</div>
             )}
           </div>
 
           {/* डिटेल्स */}
           <div className="text-left leading-tight overflow-hidden flex-1 min-w-0">
-            <h2 className="text-[11px] font-bold text-zinc-900 uppercase truncate">{employee.fullName}</h2>
-            <p className="text-[8.5px] font-semibold text-amber-600 mb-0.5 truncate">{employee.designation}</p>
+            <h2 className="text-[13px] font-bold text-zinc-900 uppercase truncate">{employee.fullName}</h2>
+            <p className="text-[10px] font-semibold text-amber-600 mb-0.5 truncate">{employee.designation}</p>
 
-            <p className="text-[7.5px] text-gray-600 truncate"><span className="font-bold text-gray-700">Emp Id:</span> {employee.employeeId}</p>
-            <p className="text-[7.5px] text-gray-600 truncate"><span className="font-bold text-gray-700">DOJ:</span> {employee.joiningDate || 'N/A'}</p>
-            <p className="text-[7.5px] text-gray-600 truncate"><span className="font-bold text-gray-700">Location:</span> {employee.workLocation || 'N/A'}</p>
-            <p className="text-[7.5px] text-gray-600 truncate"><span className="font-bold text-gray-700">Blood Gp:</span> {employee.bloodGroup || 'N/A'}</p>
-            <p className="text-[7.5px] text-gray-600 truncate"><span className="font-bold text-gray-700">Mobile:</span> {employee.mobileNumber}</p>
+            <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">Emp Id:</span> {employee.employeeId}</p>
+            <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">DOJ:</span> {employee.joiningDate || 'N/A'}</p>
+            <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">Location:</span> {employee.workLocation || 'N/A'}</p>
+            <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">Blood Gp:</span> {employee.bloodGroup || 'N/A'}</p>
+            <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">Mobile:</span> {employee.mobileNumber}</p>
           </div>
 
           {/* QR कोड (दाईं तरफ) */}
@@ -903,7 +903,7 @@ function IdCardFaces({ employee, qrSrc, profileImg }: { employee: any; qrSrc: st
             {qrSrc && (
               <img src={qrSrc} alt="Verification QR" className="w-[46px] h-[46px] border border-gray-200 rounded" />
             )}
-            <p className="text-[5px] text-gray-500 mt-0.5 uppercase tracking-wide text-center leading-none">Scan to<br />verify</p>
+            <p className="text-[6px] text-gray-500 mt-0.5 uppercase tracking-wide text-center leading-none">Scan to<br />verify</p>
           </div>
         </div>
 
@@ -912,40 +912,40 @@ function IdCardFaces({ employee, qrSrc, profileImg }: { employee: any; qrSrc: st
       </div>
 
       {/* 2. BACK SIDE (पीछे का भाग - कंपनी विवरण के साथ) */}
-      <div className="id-card w-[3.375in] h-[2.125in] bg-zinc-900 border border-zinc-800 rounded-xl shadow-md relative flex flex-col justify-between p-3 text-white font-sans select-none shrink-0">
+      <div className="id-card w-[3.375in] h-[2.125in] bg-white border border-gray-300 rounded-xl shadow-md relative flex flex-col justify-between p-3 text-black font-sans select-none shrink-0">
 
         {/* हेडर: लोगो और कंपनी नाम */}
-        <div className="flex items-center justify-center gap-2 border-b border-white/10 pb-1.5">
+        <div className="flex items-center justify-center gap-2 border-b border-gray-200 pb-1.5">
           <img
             src="/logo.png"
             alt="Company Logo"
-            className="w-6 h-6 rounded-full bg-white p-0.5 object-contain shrink-0"
+            className="w-6 h-6 rounded-full bg-white p-0.5 object-contain shrink-0 border border-gray-200"
           />
-          <h3 className="text-[9px] font-bold text-amber-500 uppercase tracking-wide">Sachin Security Services</h3>
+          <h3 className="text-[10.5px] font-bold text-amber-600 uppercase tracking-wide">Sachin Security Services</h3>
         </div>
 
         {/* कंपनी संपर्क विवरण */}
         <div className="text-center px-1">
-          <p className="text-[6.5px] font-bold text-white uppercase tracking-wider">Corporate Office</p>
-          <p className="text-[6.5px] text-gray-300 mt-0.5 leading-snug">
+          <p className="text-[8px] font-bold text-zinc-900 uppercase tracking-wider">Corporate Office</p>
+          <p className="text-[8px] font-semibold text-gray-700 mt-0.5 leading-snug">
             410, 411, Oneindiabulls, Nr. Jetalpur Over Bridge,<br />
             Jetalpur, Vadodara - 390007
           </p>
-          <p className="text-[6.5px] text-gray-300 mt-1 leading-snug">
+          <p className="text-[8px] font-semibold text-gray-700 mt-1 leading-snug">
             +91 6357889701 &nbsp;|&nbsp; info@sachinsecurity.co.in<br />
             www.sachinsecurity.co.in
           </p>
         </div>
 
         {/* निर्देश (1-2 लाइन) */}
-        <p className="text-[6px] text-gray-400 text-center px-2 leading-normal">
+        <p className="text-[7px] font-semibold text-gray-500 text-center px-2 leading-normal">
           This card is the property of Sachin Security Services and is non-transferable. If found, please return it to the corporate office above.
         </p>
 
         {/* सिग्नेचर एरिया */}
-        <div className="flex justify-between items-end text-[7.5px] px-1 text-gray-400">
-          <p className="border-t border-gray-600 pt-1 px-1">Authorized Signatory</p>
-          <p className="font-mono text-[7px] text-amber-500">{employee.employeeId}</p>
+        <div className="flex justify-between items-end text-[8.5px] font-semibold px-1 text-gray-700">
+          <p className="border-t border-gray-400 pt-1 px-1">Authorized Signatory</p>
+          <p className="font-mono font-bold text-[8px] text-amber-600">{employee.employeeId}</p>
         </div>
       </div>
     </>
