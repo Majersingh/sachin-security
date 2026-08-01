@@ -287,22 +287,26 @@ export default function UserManagementPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email <span className="text-gray-400 font-normal">(email or employee ID required)</span>
+                </label>
                 <input
                   type="email"
                   value={createForm.email}
                   onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
-                  placeholder="used as the login ID"
+                  placeholder="login ID — if no employee ID"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Employee ID <span className="text-gray-400 font-normal">(email or employee ID required)</span>
+                </label>
                 <input
                   type="text"
                   value={createForm.employeeId}
                   onChange={(e) => setCreateForm((f) => ({ ...f, employeeId: e.target.value }))}
-                  placeholder="optional — e.g. ss-123"
+                  placeholder="login ID — e.g. ss-123"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
