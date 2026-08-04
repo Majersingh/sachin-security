@@ -73,6 +73,29 @@ export default function UserManagementPage() {
     return () => clearTimeout(t);
   }, [query, load]);
 
+  const updateRole = async (u: User, role: string) => {
+    if (role === u.role) return;
+    const prevRole = u.role;
+    setBusyId(u._id);
+    setError("");
+    // Optimistic update; revert on failure.
+    setUsers((prev) => prev.map((x) => (x._id === u._id ? { ...x, role } : x)));
+    try {
+      const res = await fetch(`/api/users/${u._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error || "Failed to update role");
+        setUsers((prev) => prev.map((x) => (x._id === u._id ? { ...x, role: prevRole } : x)));
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const toggleActive = async (u: User) => {
     const next = !(u.active ?? true);
     setBusyId(u._id);
@@ -211,7 +234,15 @@ export default function UserManagementPage() {
                           </td>
                           <td className="px-4 py-3 text-gray-700">{u.email || u.employeeId || "—"}</td>
                           <td className="px-4 py-3">
-                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 capitalize">{u.role}</span>
+                            <select
+                              value={u.role}
+                              onChange={(e) => updateRole(u, e.target.value)}
+                              disabled={busyId === u._id || isSelf}
+                              title={isSelf ? "You can't change your own role" : "Change role"}
+                              className="text-xs border border-gray-300 rounded-lg px-2 py-1 capitalize focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {ROLES.map((r) => <option key={r} value={r} className="capitalize">{r}</option>)}
+                            </select>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">

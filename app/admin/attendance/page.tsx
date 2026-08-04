@@ -52,6 +52,7 @@ export default function AdminAttendancePage() {
   // Daily
   const [date, setDate] = useState(istDateString());
   const [daySearch, setDaySearch] = useState("");
+  const [dayStatus, setDayStatus] = useState<"" | "Present" | "Half Day" | "Absent">(""); // "" = all
   const [dayRows, setDayRows] = useState<any[]>([]);
   const [daySummary, setDaySummary] = useState<any>(null);
   const [dayPage, setDayPage] = useState(1);
@@ -71,6 +72,7 @@ export default function AdminAttendancePage() {
     try {
       const params = new URLSearchParams({ date, page: String(targetPage), limit: String(DAY_PAGE_SIZE) });
       if (daySearch.trim()) params.set("search", daySearch.trim());
+      if (dayStatus) params.set("status", dayStatus);
       const res = await fetch(`/api/attendance?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
@@ -83,7 +85,7 @@ export default function AdminAttendancePage() {
     } finally {
       setLoading(false);
     }
-  }, [date, daySearch]);
+  }, [date, daySearch, dayStatus]);
 
   const loadMonth = useCallback(async () => {
     if (!employeeId) return;
@@ -154,10 +156,10 @@ export default function AdminAttendancePage() {
 
           {daySummary && (
             <div className="grid grid-cols-4 gap-3 mb-5">
-              <SummaryTile label="Present" value={daySummary.present} color="green" />
-              <SummaryTile label="Half Day" value={daySummary.halfDay} color="amber" />
-              <SummaryTile label="Absent" value={daySummary.absent} color="red" />
-              <SummaryTile label="Total" value={daySummary.total} color="gray" />
+              <SummaryTile label="Present" value={daySummary.present} color="green" active={dayStatus === "Present"} onClick={() => setDayStatus((s) => (s === "Present" ? "" : "Present"))} />
+              <SummaryTile label="Half Day" value={daySummary.halfDay} color="amber" active={dayStatus === "Half Day"} onClick={() => setDayStatus((s) => (s === "Half Day" ? "" : "Half Day"))} />
+              <SummaryTile label="Absent" value={daySummary.absent} color="red" active={dayStatus === "Absent"} onClick={() => setDayStatus((s) => (s === "Absent" ? "" : "Absent"))} />
+              <SummaryTile label="Total" value={daySummary.total} color="gray" active={dayStatus === ""} onClick={() => setDayStatus("")} />
             </div>
           )}
 
@@ -285,17 +287,36 @@ export default function AdminAttendancePage() {
   );
 }
 
-function SummaryTile({ label, value, color }: { label: string; value: number; color: string }) {
+function SummaryTile({ label, value, color, active, onClick }: {
+  label: string; value: number; color: string; active?: boolean; onClick?: () => void;
+}) {
   const map: Record<string, string> = {
     green: "bg-green-50 text-green-700",
     amber: "bg-amber-50 text-amber-700",
     red: "bg-red-50 text-red-700",
     gray: "bg-gray-50 text-gray-700",
   };
+  const ring: Record<string, string> = {
+    green: "ring-2 ring-green-500",
+    amber: "ring-2 ring-amber-500",
+    red: "ring-2 ring-red-500",
+    gray: "ring-2 ring-gray-500",
+  };
+  const cls = `rounded-lg p-3 text-center ${map[color]} ${active ? ring[color] : ""}`;
+
+  // Clickable (daily filter tiles) vs static (monthly view).
+  if (!onClick) {
+    return (
+      <div className={cls}>
+        <p className="text-2xl font-bold">{value ?? 0}</p>
+        <p className="text-xs">{label}</p>
+      </div>
+    );
+  }
   return (
-    <div className={`rounded-lg p-3 text-center ${map[color]}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`${cls} transition hover:brightness-95 cursor-pointer`}>
       <p className="text-2xl font-bold">{value ?? 0}</p>
-      <p className="text-xs">{label}</p>
-    </div>
+      <p className="text-xs">{label}{active ? " ✓" : ""}</p>
+    </button>
   );
 }

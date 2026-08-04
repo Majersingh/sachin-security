@@ -44,9 +44,10 @@ export async function GET(request: Request) {
     });
   }
 
-  // --- Daily view across all employees (paginated + searchable) ---
+  // --- Daily view across all employees (paginated + searchable + status filter) ---
   const date = params.get("date") || istDateString();
   const search = (params.get("search") || "").trim();
+  const status = (params.get("status") || "").trim(); // "", "Present", "Half Day", "Absent"
   const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1);
   const limit = Math.min(200, Math.max(1, parseInt(params.get("limit") || "50", 10) || 50));
   const skip = (page - 1) * limit;
@@ -54,6 +55,16 @@ export async function GET(request: Request) {
   const employees = await getCollection("employees");
   const empQuery: any = {};
   if (search) empQuery.fullName = { $regex: search, $options: "i" };
+
+  // Status filter: restrict the employee set by their attendance status for the day.
+  // Present/Half Day come from stored records; Absent = anyone with no such record.
+  if (status === "Present" || status === "Half Day") {
+    const ids = await attendance.distinct("employeeId", { date, status });
+    empQuery.employeeId = { $in: ids };
+  } else if (status === "Absent") {
+    const nonAbsent = await attendance.distinct("employeeId", { date, status: { $in: ["Present", "Half Day"] } });
+    empQuery.employeeId = { $nin: nonAbsent };
+  }
 
   const total = await employees.countDocuments(empQuery);
   const empList = await employees
