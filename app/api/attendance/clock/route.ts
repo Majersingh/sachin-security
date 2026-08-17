@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { getCollection } from "@/app/lib/db";
 import { requirePermission } from "@/app/lib/apiAuth";
-import { istDateString, computeStatus, isValidGeo, evaluateGeofence } from "@/app/lib/attendance";
+import { istDateString, computeStatus, isValidGeo, evaluateGeofence, MAX_OPEN_SHIFT_HOURS } from "@/app/lib/attendance";
 
 export async function POST(request: Request) {
   const perm = await requirePermission("attendance:write:self");
@@ -86,20 +86,40 @@ export async function POST(request: Request) {
   }
 
   // type === "out"
-  if (!existing?.clockIn) {
-    return NextResponse.json({ success: false, error: "You must clock in before clocking out" }, { status: 400 });
-  }
-  if (existing.clockOut) {
+  // Duplicate clock-out for a shift already completed today.
+  if (existing?.clockIn && existing.clockOut) {
     return NextResponse.json({ success: false, error: "Already clocked out today" }, { status: 400 });
   }
 
-  const workedMinutes = Math.max(0, Math.round((now.getTime() - new Date(existing.clockIn.at).getTime()) / 60000));
+  // Which shift to close: today's open record if there is one; otherwise the most
+  // recent still-open shift (clockIn set, no clockOut) started within the lookback
+  // window. This closes an overnight shift that crossed midnight into a new date —
+  // e.g. clocked in 10 PM yesterday, clocking out 6 AM today. The shift stays dated
+  // to the day it started, so duty is credited there.
+  let openRecord = existing?.clockIn && !existing.clockOut ? existing : null;
+  if (!openRecord) {
+    const cutoff = new Date(now.getTime() - MAX_OPEN_SHIFT_HOURS * 3600 * 1000);
+    openRecord = await collection.findOne(
+      { employeeId, clockIn: { $exists: true }, clockOut: { $exists: false }, "clockIn.at": { $gte: cutoff } },
+      { sort: { "clockIn.at": -1 } }
+    );
+  }
+  if (!openRecord?.clockIn) {
+    return NextResponse.json({ success: false, error: "You must clock in before clocking out" }, { status: 400 });
+  }
+
+  const workedMinutes = Math.max(0, Math.round((now.getTime() - new Date(openRecord.clockIn.at).getTime()) / 60000));
   await collection.updateOne(
-    { employeeId, date },
+    { _id: openRecord._id },
     { $set: { clockOut: punch, workedMinutes, status: computeStatus(workedMinutes), updatedAt: now } }
   );
-  const record = await collection.findOne({ employeeId, date });
-  return NextResponse.json({ success: true, message: "Clocked out", data: record });
+  const record = await collection.findOne({ _id: openRecord._id });
+  const crossedDay = record?.date && record.date !== date;
+  return NextResponse.json({
+    success: true,
+    message: crossedDay ? `Clocked out (shift of ${record.date})` : "Clocked out",
+    data: record,
+  });
 }
 
 function escapeRegex(s: string) {

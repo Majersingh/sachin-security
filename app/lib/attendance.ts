@@ -4,6 +4,11 @@
 export const ATTENDANCE_TZ = "Asia/Kolkata";
 export const HALF_DAY_MINUTES = 240; // < 4 worked hours => Half Day
 
+// Longest a shift may stay open before a clock-out will no longer auto-close it.
+// Lets an overnight shift (e.g. 10 PM → 6 AM) be closed the next morning, while a
+// clock-out someone forgot days ago won't be attached to today's punch.
+export const MAX_OPEN_SHIFT_HOURS = 18;
+
 // --- Geofence tuning ---
 // Default allowed distance from the assigned site, in metres. Chosen so ordinary
 // phone GPS jitter (typically 10–30 m, worse near buildings) does not lock out a
