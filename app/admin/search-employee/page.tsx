@@ -172,29 +172,25 @@ export default function SearchEmployeePage() {
     setIsIdModalOpen(true);
   };
 
-  // Export to CSV
-  const handleExport = () => {
-    const csv = [
-      ['Employee ID', 'Name', 'Designation', 'Department', 'City', 'Gender', 'Joining Date', 'Mobile', 'Status'].join(','),
-      ...filteredEmployees.map(emp => [
-        emp.employeeId,
-        emp.fullName,
-        emp.designation,
-        emp.department,
-        emp.city,
-        emp.gender,
-        emp.joiningDate,
-        emp.mobileNumber,
-        emp.status
-      ].join(','))
-    ].join('\n');
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
+  // Export the full filtered set (not just the current page) as .xlsx, using the
+  // same search + filters the server applies to the table.
+  const handleExportExcel = () => {
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) {
+      params.append('search', searchQuery.trim());
+      params.append('searchBy', searchBy);
+    }
+    if (filters.workLocation) params.append('workLocation', filters.workLocation);
+    if (filters.state) params.append('state', filters.state);
+    if (filters.gender) params.append('gender', filters.gender);
+    if (filters.department) params.append('department', filters.department);
+    if (filters.designation) params.append('designation', filters.designation);
+
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `employees_${new Date().toISOString().split('T')[0]}.csv`;
+    a.href = `/api/employees/export?${params.toString()}`;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
   };
 
   if (isLoading) {
@@ -210,9 +206,9 @@ export default function SearchEmployeePage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Search Employee</h1>
-        <p className="text-gray-600">Find and manage employee records</p>
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">Search Employee</h1>
+        <p className="text-gray-600 text-sm">Find and manage employee records</p>
       </div>
 
       {/* Search Section */}
@@ -389,6 +385,13 @@ export default function SearchEmployeePage() {
             >
               Clear All
             </button>
+            <button
+              onClick={handleExportExcel}
+              className="flex-1 border border-green-600 text-green-700 py-2 rounded-lg hover:bg-green-50 font-semibold flex items-center justify-center gap-2"
+              title="Download all rows matching the current search & filters"
+            >
+              <Download className="w-4 h-4" /> Export Excel
+            </button>
           </div>
         </div>
       )}
@@ -406,13 +409,15 @@ export default function SearchEmployeePage() {
                 : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total}`}
             </p>
           </div>
-          {/* <button
-            onClick={handleExport}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2"
+          <button
+            onClick={handleExportExcel}
+            disabled={total === 0}
+            className="px-4 py-2 border border-green-600 text-green-700 rounded-lg hover:bg-green-50 font-medium flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Download all rows matching the current search & filters"
           >
             <Download className="w-4 h-4" />
-            Export CSV
-          </button> */}
+            Export Excel
+          </button>
         </div>
 
         {/* Employee Table */}
