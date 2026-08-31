@@ -898,7 +898,6 @@ function IdCardFaces({ employee, qrSrc, profileImg }: { employee: any; qrSrc: st
 
             <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">Emp Id:</span> {employee.employeeId}</p>
             <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">DOJ:</span> {employee.joiningDate || 'N/A'}</p>
-            <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">Location:</span> {employee.workLocation || 'N/A'}</p>
             <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">Blood Gp:</span> {employee.bloodGroup || 'N/A'}</p>
             <p className="text-[9px] font-semibold text-gray-700 truncate"><span className="font-bold text-gray-900">Mobile:</span> {employee.mobileNumber}</p>
           </div>

@@ -52,9 +52,12 @@ export async function GET(request: Request) {
   const limit = Math.min(200, Math.max(1, parseInt(params.get("limit") || "50", 10) || 50));
   const skip = (page - 1) * limit;
 
+  const location = (params.get("location") || "").trim();
+
   const employees = await getCollection("employees");
   const empQuery: any = {};
   if (search) empQuery.fullName = { $regex: search, $options: "i" };
+  if (location) empQuery.workLocation = location; // show only this site's staff
 
   // Status filter: restrict the employee set by their attendance status for the day.
   // Present/Half Day come from stored records; Absent = anyone with no such record.
@@ -95,11 +98,19 @@ export async function GET(request: Request) {
       };
     });
 
-  // Summary reflects the whole organization for the day (not just this page):
-  // present/half-day come from stored records; absent = everyone else.
-  const totalEmployees = await employees.countDocuments({});
-  const present = await attendance.countDocuments({ date, status: "Present" });
-  const halfDay = await attendance.countDocuments({ date, status: "Half Day" });
+  // Summary reflects the day across all matching employees (not just this page).
+  // It respects the location filter (so a site shows its own breakdown) but not
+  // the search/status filters. present/half-day come from stored records;
+  // absent = everyone else.
+  const scopeQuery: any = location ? { workLocation: location } : {};
+  const totalEmployees = await employees.countDocuments(scopeQuery);
+  const attFilter: any = { date };
+  if (location) {
+    const scopeIds = await employees.distinct("employeeId", scopeQuery);
+    attFilter.employeeId = { $in: scopeIds };
+  }
+  const present = await attendance.countDocuments({ ...attFilter, status: "Present" });
+  const halfDay = await attendance.countDocuments({ ...attFilter, status: "Half Day" });
   const summary = {
     present,
     halfDay,

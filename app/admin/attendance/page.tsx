@@ -53,6 +53,8 @@ export default function AdminAttendancePage() {
   const [date, setDate] = useState(istDateString());
   const [daySearch, setDaySearch] = useState("");
   const [dayStatus, setDayStatus] = useState<"" | "Present" | "Half Day" | "Absent">(""); // "" = all
+  const [dayLocation, setDayLocation] = useState(""); // "" = all locations
+  const [locationOptions, setLocationOptions] = useState<string[]>([]);
   const [dayRows, setDayRows] = useState<any[]>([]);
   const [daySummary, setDaySummary] = useState<any>(null);
   const [dayPage, setDayPage] = useState(1);
@@ -64,8 +66,17 @@ export default function AdminAttendancePage() {
   const [employeeId, setEmployeeId] = useState("");
   const [month, setMonth] = useState(istMonthString());
   const [monthData, setMonthData] = useState<any>(null);
+  const [monthLocation, setMonthLocation] = useState(""); // for the location-wide export
 
   const [loading, setLoading] = useState(false);
+
+  // Work-location options for the daily filter (distinct values across employees).
+  useEffect(() => {
+    fetch("/api/employees?meta=filters")
+      .then((r) => r.json())
+      .then((d) => { if (d.success && d.filters?.workLocations) setLocationOptions(d.filters.workLocations); })
+      .catch(() => {});
+  }, []);
 
   const loadDay = useCallback(async (targetPage: number) => {
     setLoading(true);
@@ -73,6 +84,7 @@ export default function AdminAttendancePage() {
       const params = new URLSearchParams({ date, page: String(targetPage), limit: String(DAY_PAGE_SIZE) });
       if (daySearch.trim()) params.set("search", daySearch.trim());
       if (dayStatus) params.set("status", dayStatus);
+      if (dayLocation) params.set("location", dayLocation);
       const res = await fetch(`/api/attendance?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
@@ -85,7 +97,7 @@ export default function AdminAttendancePage() {
     } finally {
       setLoading(false);
     }
-  }, [date, daySearch, dayStatus]);
+  }, [date, daySearch, dayStatus, dayLocation]);
 
   const loadMonth = useCallback(async () => {
     if (!employeeId) return;
@@ -152,6 +164,15 @@ export default function AdminAttendancePage() {
                 className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
+            <select
+              value={dayLocation}
+              onChange={(e) => setDayLocation(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 max-w-[220px]"
+              title="Filter by work location"
+            >
+              <option value="">All locations</option>
+              {locationOptions.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+            </select>
           </div>
 
           {daySummary && (
@@ -212,29 +233,59 @@ export default function AdminAttendancePage() {
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <EmployeeCombobox
-              value={employeeId}
-              onChange={(id) => setEmployeeId(id)}
-              className="w-64"
-            />
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
-            <button
-              onClick={() => {
-                if (!employeeId) return;
-                window.location.href = `/api/attendance/export?employeeId=${encodeURIComponent(employeeId)}&month=${month}`;
-              }}
-              disabled={!employeeId}
-              title={employeeId ? "Download this month as a colour-coded Excel calendar" : "Select an employee first"}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FileSpreadsheet className="w-4 h-4" /> Export Excel
-            </button>
+          <div className="space-y-3 mb-5">
+            {/* Shared month */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700 w-28 shrink-0">Month</label>
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            {/* One employee — shows the report below + exports that employee's calendar */}
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-sm font-medium text-gray-700 w-28 shrink-0">One employee</label>
+              <EmployeeCombobox value={employeeId} onChange={(id) => setEmployeeId(id)} className="w-64" />
+              <button
+                onClick={() => {
+                  if (!employeeId) return;
+                  window.location.href = `/api/attendance/export?employeeId=${encodeURIComponent(employeeId)}&month=${month}`;
+                }}
+                disabled={!employeeId}
+                title={employeeId ? "Download this employee's month as a colour-coded calendar" : "Select an employee first"}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                <FileSpreadsheet className="w-4 h-4" /> Export employee
+              </button>
+            </div>
+
+            {/* Whole location — exports every employee at that site (muster roll) */}
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-sm font-medium text-gray-700 w-28 shrink-0">Whole location</label>
+              <select
+                value={monthLocation}
+                onChange={(e) => setMonthLocation(e.target.value)}
+                className="w-64 px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                title="Pick a location to export all its employees' attendance"
+              >
+                <option value="">Select a location…</option>
+                {locationOptions.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+              </select>
+              <button
+                onClick={() => {
+                  if (!monthLocation) return;
+                  window.location.href = `/api/attendance/export-location?location=${encodeURIComponent(monthLocation)}&month=${month}`;
+                }}
+                disabled={!monthLocation}
+                title={monthLocation ? "Download all employees at this location for the month" : "Select a location first"}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-green-700 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                <FileSpreadsheet className="w-4 h-4" /> Export location
+              </button>
+            </div>
           </div>
 
           {monthData?.summary && (
